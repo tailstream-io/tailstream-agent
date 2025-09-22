@@ -6,9 +6,13 @@ A lightweight Go agent that automatically discovers and parses common web server
 
 ### Simple Installation
 
-1. **Download** the binary for your platform from [Releases](https://github.com/your-username/tailstream-agent/releases)
-2. **Run the setup wizard** (first time only):
+1. **Download** the binary for your platform:
+   - **Linux (x86_64)**: [tailstream-agent-linux-amd64](https://github.com/your-username/tailstream-agent/releases/latest/download/tailstream-agent-linux-amd64)
+   - **Linux (ARM64)**: [tailstream-agent-linux-arm64](https://github.com/your-username/tailstream-agent/releases/latest/download/tailstream-agent-linux-arm64)
+   - **All releases**: [GitHub Releases](https://github.com/your-username/tailstream-agent/releases)
+2. **Make executable and run setup** (first time only):
    ```bash
+   chmod +x tailstream-agent-linux-amd64
    ./tailstream-agent-linux-amd64
    ```
 3. **Enter your Stream ID and Access Token** when prompted
@@ -75,7 +79,6 @@ discovery:
       - "**/*.gz"
       - "**/*.1"
 ship:
-  url: "https://app.tailstream.io/api/ingest/your-stream-id"
   stream_id: "your-stream-id"
 ```
 
@@ -185,7 +188,6 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 |----------|---------|-------------|
 | `TAILSTREAM_KEY` | - | Your Tailstream access token |
 | `TAILSTREAM_ENV` | `production` | Environment label |
-| `TAILSTREAM_URL` | - | Full ingest endpoint URL |
 
 #### Command Line Flags
 
@@ -193,7 +195,6 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 |------|-------------|
 | `--config` | Path to YAML configuration file (default: system-wide or tailstream.yaml) |
 | `--env` | Override environment label |
-| `--ship-url` | Override ingest endpoint URL |
 | `--debug` | Enable verbose debug output |
 
 #### Configuration Options
@@ -217,7 +218,7 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 
 **Shipping Settings:**
 
-- `ship.url` (string): Tailstream ingest endpoint URL
+- `ship.stream_id` (string): Tailstream stream ID (URL auto-constructed as https://app.tailstream.io/api/ingest/{stream_id})
 
 ### Usage Examples
 
@@ -233,10 +234,22 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 ./tailstream-agent-linux-amd64 --debug  # With debug output
 ```
 
-#### Manual configuration with environment variables:
+#### Manual configuration with YAML:
 ```bash
-TAILSTREAM_KEY=your-access-token \
-TAILSTREAM_URL=https://app.tailstream.io/api/ingest/your-stream-id \
+# Create tailstream.yaml
+cat > tailstream.yaml << EOF
+env: production
+key: your-access-token
+ship:
+  stream_id: your-stream-id
+discovery:
+  enabled: true
+  paths:
+    include:
+      - "/var/log/nginx/*.log"
+      - "/var/log/caddy/*.log"
+EOF
+
 ./tailstream-agent-linux-amd64
 ```
 
@@ -245,13 +258,36 @@ TAILSTREAM_URL=https://app.tailstream.io/api/ingest/your-stream-id \
 ./tailstream-agent-linux-amd64 --config /etc/tailstream/agent.yaml
 ```
 
-#### Docker usage:
+#### Docker usage (with config file):
 ```bash
-docker run -e TAILSTREAM_KEY=your-token \
-  -e TAILSTREAM_URL=https://app.tailstream.io/api/ingest/your-stream-id \
+# Create config file first
+cat > tailstream.yaml << EOF
+env: production
+key: your-access-token
+ship:
+  stream_id: your-stream-id
+discovery:
+  enabled: true
+  paths:
+    include:
+      - "/var/log/nginx/*.log"
+      - "/var/log/caddy/*.log"
+EOF
+
+# Run with mounted config
+docker run -v $(pwd)/tailstream.yaml:/tailstream.yaml \
   -v /var/log:/var/log:ro \
   tailstream-agent
 ```
+
+#### Docker usage (environment variables):
+```bash
+docker run -e TAILSTREAM_KEY=your-token \
+  -v /var/log:/var/log:ro \
+  tailstream-agent
+```
+
+Note: With environment variables only, you'll need to run the setup wizard on first launch to configure the stream ID.
 
 ## How It Works
 

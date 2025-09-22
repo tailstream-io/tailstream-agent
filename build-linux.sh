@@ -29,6 +29,16 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
 
 cd ..
 
+# If VERSION is set, create checksums for release
+if [ -n "$VERSION" ]; then
+    echo "Creating checksums for release $VERSION..."
+    cd "$BUILD_DIR"
+    sha256sum * > checksums.txt
+    echo "✓ Checksums created:"
+    cat checksums.txt
+    cd ..
+fi
+
 echo ""
 echo "✓ Build complete!"
 ls -lah "$BUILD_DIR"
