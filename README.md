@@ -200,4 +200,4 @@ Built with Go 1.22+ using:
 
 ## License
 
-[Add your license information here]
+MIT License
