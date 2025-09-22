@@ -40,8 +40,16 @@ print_error() {
 # Check if running as root, escalate if needed
 check_root() {
     if [[ $EUID -ne 0 ]]; then
-        print_status "Installer requires root privileges, requesting sudo access..."
-        exec sudo "$0" "$@"
+        if [[ -t 0 ]]; then
+            # Interactive terminal - can use sudo directly
+            print_status "Installer requires root privileges, requesting sudo access..."
+            exec sudo "$0" "$@"
+        else
+            # Piped input - need to save script and re-run
+            print_status "Installer requires root privileges. Please run with sudo:"
+            print_status "curl https://install.tailstream.sh | sudo bash"
+            exit 1
+        fi
     fi
 }
 
