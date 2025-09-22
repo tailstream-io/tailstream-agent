@@ -37,12 +37,11 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if running as root
+# Check if running as root, escalate if needed
 check_root() {
     if [[ $EUID -ne 0 ]]; then
-        print_error "This installer must be run as root (use sudo)"
-        print_status "Usage: curl https://install.tailstream.io | sudo bash"
-        exit 1
+        print_status "Installer requires root privileges, requesting sudo access..."
+        exec sudo "$0" "$@"
     fi
 }
 
