@@ -221,7 +221,7 @@ func main() {
 					if os.Getenv("DEBUG") == "1" {
 						log.Printf("Processing line from %s (stream '%s'): %s", ll.File, streamName, ll.Line)
 					}
-					ev, ok := parseLine(ll, host)
+					ev, ok := parseLine(ll, host, sd.stream.Format)
 					if ok && ev != nil {
 						sd.batch = append(sd.batch, ev)
 						if os.Getenv("DEBUG") == "1" {

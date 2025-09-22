@@ -155,7 +155,7 @@ func TestParseLineIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ll := LogLine{File: "/test.log", Line: tt.line}
-			event, ok := parseLine(ll, "testhost")
+			event, ok := parseLine(ll, "testhost", nil)
 
 			if ok != tt.wantOk {
 				t.Errorf("parseLine() ok = %v, wantOk %v", ok, tt.wantOk)

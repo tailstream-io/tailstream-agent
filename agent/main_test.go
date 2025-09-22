@@ -33,7 +33,7 @@ func TestDiscover(t *testing.T) {
 
 func TestParseLineJSON(t *testing.T) {
 	ll := LogLine{File: "/var/log/test.log", Line: `{"msg":"hi","host":"host1","src":"/var/log/test.log","path":"/test","method":"GET","status":200,"rt":0.1,"bytes":100}`}
-	ev, ok := parseLine(ll, "host1")
+	ev, ok := parseLine(ll, "host1", nil)
 	if !ok {
 		t.Fatal("not parsed")
 	}

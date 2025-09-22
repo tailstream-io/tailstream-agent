@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	"gopkg.in/yaml.v3"
 )
@@ -61,10 +63,15 @@ func setupWizard() error {
 	}
 
 	// Save config to file
-	configPath := "tailstream.yaml"
+	configPath := getSystemConfigPath()
 	data, err := yaml.Marshal(&cfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %v", err)
+	}
+
+	// Create directory if it doesn't exist
+	if err := createConfigDir(configPath); err != nil {
+		return fmt.Errorf("failed to create config directory: %v", err)
 	}
 
 	if err := os.WriteFile(configPath, data, 0600); err != nil {
@@ -80,11 +87,38 @@ func setupWizard() error {
 	return nil
 }
 
+// getSystemConfigPath returns the appropriate system config path for the OS
+func getSystemConfigPath() string {
+	switch runtime.GOOS {
+	case "linux":
+		return "/etc/tailstream/agent.yaml"
+	case "darwin":
+		return "/usr/local/etc/tailstream/agent.yaml"
+	default:
+		// Windows or other - use current directory
+		return "tailstream.yaml"
+	}
+}
+
+// createConfigDir creates the configuration directory if it doesn't exist
+func createConfigDir(configPath string) error {
+	dir := filepath.Dir(configPath)
+	return os.MkdirAll(dir, 0755)
+}
+
 // needsSetup checks if initial setup is required
 func needsSetup() bool {
-	// Check if config file exists
-	if _, err := os.Stat("tailstream.yaml"); err == nil {
-		return false
+	// Check if config file exists in system locations
+	systemPaths := []string{
+		"/etc/tailstream/agent.yaml",
+		"/usr/local/etc/tailstream/agent.yaml",
+		"tailstream.yaml", // Local fallback
+	}
+
+	for _, path := range systemPaths {
+		if _, err := os.Stat(path); err == nil {
+			return false
+		}
 	}
 
 	// Check if environment variables are set

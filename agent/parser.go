@@ -96,8 +96,90 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 	return nil, false
 }
 
+// parseCustomFormat parses a log line using a custom format definition
+func parseCustomFormat(line, filename, hostname string, format *LogFormat) (Event, bool) {
+	if format == nil || format.Pattern == "" {
+		return nil, false
+	}
+
+	regex, err := regexp.Compile(format.Pattern)
+	if err != nil {
+		if os.Getenv("DEBUG") == "1" {
+			log.Printf("Invalid regex pattern in custom format %s: %v", format.Name, err)
+		}
+		return nil, false
+	}
+
+	matches := regex.FindStringSubmatch(line)
+	if matches == nil {
+		return nil, false
+	}
+
+	event := make(Event)
+
+	// Apply default values first
+	for key, value := range format.Default {
+		event[key] = value
+	}
+
+	// Map regex groups to fields
+	for field, groupName := range format.Fields {
+		if groupName == "hostname" {
+			event[field] = hostname
+		} else if groupName == "filename" {
+			event[field] = filename
+		} else {
+			// Try to parse as group number first
+			if groupNum, err := strconv.Atoi(groupName); err == nil && groupNum > 0 && groupNum < len(matches) {
+				value := matches[groupNum]
+
+				// Try to convert to appropriate type based on field name
+				switch field {
+				case "status":
+					if intVal, err := strconv.Atoi(value); err == nil {
+						event[field] = intVal
+					} else {
+						event[field] = value
+					}
+				case "bytes":
+					if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
+						event[field] = intVal
+					} else {
+						event[field] = value
+					}
+				case "rt":
+					if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+						event[field] = floatVal
+					} else {
+						event[field] = value
+					}
+				default:
+					event[field] = value
+				}
+			}
+		}
+	}
+
+	// Ensure required fields have defaults if not set
+	if _, hasHost := event["host"]; !hasHost {
+		event["host"] = hostname
+	}
+	if _, hasSrc := event["src"]; !hasSrc {
+		event["src"] = filename
+	}
+
+	return event, true
+}
+
 // parseLine normalizes a log line into the required Tailstream format
-func parseLine(ll LogLine, host string) (Event, bool) {
+func parseLine(ll LogLine, host string, customFormat *LogFormat) (Event, bool) {
+	// Try custom format first if provided
+	if customFormat != nil {
+		if event, ok := parseCustomFormat(ll.Line, ll.File, host, customFormat); ok {
+			return event, true
+		}
+	}
+
 	// Try to parse as JSON first
 	var m map[string]interface{}
 	if err := json.Unmarshal([]byte(ll.Line), &m); err == nil {

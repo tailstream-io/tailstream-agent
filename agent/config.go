@@ -31,14 +31,23 @@ type Config struct {
 	Streams []StreamConfig `yaml:"streams,omitempty"`
 }
 
+// LogFormat defines a custom log format configuration
+type LogFormat struct {
+	Name    string            `yaml:"name"`              // Human-readable name for this format
+	Pattern string            `yaml:"pattern"`           // Regex pattern to match log lines
+	Fields  map[string]string `yaml:"fields"`            // Field mapping from regex groups to output fields
+	Default map[string]any    `yaml:"default,omitempty"` // Default values for missing fields
+}
+
 // StreamConfig defines a destination stream with its own settings
 type StreamConfig struct {
-	Name      string   `yaml:"name"`              // Human-readable name for this stream
-	StreamID  string   `yaml:"stream_id"`         // Stream ID - URL will be constructed as https://app.tailstream.io/api/ingest/{stream_id}
-	Key       string   `yaml:"key,omitempty"`     // Optional stream-specific access token
-	Paths     []string `yaml:"paths"`             // Log file patterns for this stream
-	Exclude   []string `yaml:"exclude,omitempty"` // Exclusion patterns for this stream
-	LegacyURL string   `yaml:"-"`                 // Legacy URL override (not saved to YAML)
+	Name      string     `yaml:"name"`              // Human-readable name for this stream
+	StreamID  string     `yaml:"stream_id"`         // Stream ID - URL will be constructed as https://app.tailstream.io/api/ingest/{stream_id}
+	Key       string     `yaml:"key,omitempty"`     // Optional stream-specific access token
+	Paths     []string   `yaml:"paths"`             // Log file patterns for this stream
+	Exclude   []string   `yaml:"exclude,omitempty"` // Exclusion patterns for this stream
+	Format    *LogFormat `yaml:"format,omitempty"`  // Custom log format for this stream
+	LegacyURL string     `yaml:"-"`                 // Legacy URL override (not saved to YAML)
 }
 
 // GetURL returns the full ingest URL for this stream
@@ -67,7 +76,7 @@ func loadConfig() Config {
 
 	// Parse flags only if not already parsed (to avoid redefinition in tests)
 	if !flag.Parsed() {
-		configFile := flag.String("config", "tailstream.yaml", "path to YAML config")
+		configFile := flag.String("config", getDefaultConfigPath(), "path to YAML config")
 		envFlag := flag.String("env", "", "environment")
 		shipURL := flag.String("ship-url", "", "ship URL")
 		debug := flag.Bool("debug", false, "enable debug output")
@@ -112,4 +121,22 @@ func getenv(k, def string) string {
 		return def
 	}
 	return v
+}
+
+// getDefaultConfigPath returns the default config file path based on the OS
+func getDefaultConfigPath() string {
+	// Try system-wide locations first
+	systemPaths := []string{
+		"/etc/tailstream/agent.yaml",     // Linux system-wide
+		"/usr/local/etc/tailstream/agent.yaml", // macOS system-wide
+	}
+
+	for _, path := range systemPaths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	// Fall back to current directory for development/testing
+	return "tailstream.yaml"
 }

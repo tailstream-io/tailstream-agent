@@ -48,9 +48,16 @@ After setup, simply run:
 
 ## Configuration
 
-### Configuration File (tailstream.yaml)
+### Configuration File
 
-After running the setup wizard, a `tailstream.yaml` file is created with your configuration:
+The agent looks for configuration files in the following order:
+
+1. **System-wide locations** (recommended for production):
+   - Linux: `/etc/tailstream/agent.yaml`
+   - macOS: `/usr/local/etc/tailstream/agent.yaml`
+2. **Current directory**: `tailstream.yaml` (development/testing)
+
+After running the setup wizard, a configuration file is created with your settings:
 
 ```yaml
 env: production
@@ -116,7 +123,57 @@ streams:
 - **Independent access control**: Use different access tokens per stream
 - **Organized log routing**: Route nginx logs, application logs, and system logs separately
 - **Flexible patterns**: Each stream can have its own include/exclude patterns
+- **Custom log formats**: Define custom regex patterns to parse application-specific logs
 - **Backward compatible**: Existing single-stream configs continue to work
+
+### Custom Log Formats
+
+For applications that generate logs in custom formats, you can define parsing rules per stream:
+
+```yaml
+streams:
+  - name: "app-logs"
+    stream_id: "app-stream-id"
+    paths:
+      - "/var/log/myapp/*.log"
+    format:
+      name: "myapp-format"
+      pattern: '\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+): (.+)'
+      fields:
+        method: "2"      # Log level (INFO, ERROR, etc)
+        path: "3"        # Component name
+        host: "hostname" # Use server hostname
+        src: "filename"  # Use source file path
+      default:
+        status: 200      # Default HTTP status for app logs
+        rt: 0.0         # Default response time
+        bytes: 0        # Default bytes transferred
+
+  - name: "custom-access-logs"
+    stream_id: "access-stream-id"
+    paths:
+      - "/var/log/custom-app/access.log"
+    format:
+      name: "custom-access"
+      pattern: '^(\d+\.\d+\.\d+\.\d+) - (\w+) (\S+) (\d+) (\d+) ([0-9.]+)'
+      fields:
+        ip: "1"
+        method: "2"
+        path: "3"
+        status: "4"
+        bytes: "5"
+        rt: "6"
+```
+
+#### Custom Format Fields
+
+- **Pattern**: Regex pattern with capture groups (use single quotes to avoid YAML escaping)
+- **Fields**: Map regex group numbers to output field names
+- **Special placeholders**:
+  - `"hostname"`: Uses server hostname
+  - `"filename"`: Uses source file path
+- **Default**: Default values for missing fields
+- **Auto-conversion**: `status`, `bytes`, and `rt` fields are automatically converted to appropriate types
 
 ### Manual Configuration
 
@@ -134,7 +191,7 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 
 | Flag | Description |
 |------|-------------|
-| `--config` | Path to YAML configuration file (default: tailstream.yaml) |
+| `--config` | Path to YAML configuration file (default: system-wide or tailstream.yaml) |
 | `--env` | Override environment label |
 | `--ship-url` | Override ingest endpoint URL |
 | `--debug` | Enable verbose debug output |
