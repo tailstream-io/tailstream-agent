@@ -10,16 +10,13 @@ import (
 func TestLoadConfigDefaults(t *testing.T) {
 	// Clear any existing environment variables
 	oldKey := os.Getenv("TAILSTREAM_KEY")
-	oldURL := os.Getenv("TAILSTREAM_URL")
 	oldEnv := os.Getenv("TAILSTREAM_ENV")
 	defer func() {
 		os.Setenv("TAILSTREAM_KEY", oldKey)
-		os.Setenv("TAILSTREAM_URL", oldURL)
 		os.Setenv("TAILSTREAM_ENV", oldEnv)
 	}()
 
 	os.Unsetenv("TAILSTREAM_KEY")
-	os.Unsetenv("TAILSTREAM_URL")
 	os.Unsetenv("TAILSTREAM_ENV")
 
 	// Override command line args to avoid conflicts
@@ -114,11 +111,9 @@ streams:
 func TestLoadConfigEnvironmentOverrides(t *testing.T) {
 	// Set environment variables
 	os.Setenv("TAILSTREAM_KEY", "env-key")
-	os.Setenv("TAILSTREAM_URL", "https://env.example.com")
 	os.Setenv("TAILSTREAM_ENV", "development")
 	defer func() {
 		os.Unsetenv("TAILSTREAM_KEY")
-		os.Unsetenv("TAILSTREAM_URL")
 		os.Unsetenv("TAILSTREAM_ENV")
 	}()
 
@@ -130,10 +125,6 @@ func TestLoadConfigEnvironmentOverrides(t *testing.T) {
 
 	if cfg.Key != "env-key" {
 		t.Errorf("Expected key from environment, got: %s", cfg.Key)
-	}
-
-	if cfg.Ship.URL != "https://env.example.com" {
-		t.Errorf("Expected URL from environment, got: %s", cfg.Ship.URL)
 	}
 
 	// Note: TAILSTREAM_ENV should override the default but we load it into cfg.Env

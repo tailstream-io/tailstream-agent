@@ -78,7 +78,6 @@ func loadConfig() Config {
 	if !flag.Parsed() {
 		configFile := flag.String("config", getDefaultConfigPath(), "path to YAML config")
 		envFlag := flag.String("env", "", "environment")
-		shipURL := flag.String("ship-url", "", "ship URL")
 		debug := flag.Bool("debug", false, "enable debug output")
 		flag.Parse()
 
@@ -90,9 +89,6 @@ func loadConfig() Config {
 		// Apply flag overrides
 		if *envFlag != "" {
 			cfg.Env = *envFlag
-		}
-		if *shipURL != "" {
-			cfg.Ship.URL = *shipURL
 		}
 		if *debug {
 			os.Setenv("DEBUG", "1")
@@ -107,9 +103,6 @@ func loadConfig() Config {
 	// Environment variable overrides (always apply)
 	if envKey := os.Getenv("TAILSTREAM_KEY"); envKey != "" {
 		cfg.Key = envKey
-	}
-	if envURL := os.Getenv("TAILSTREAM_URL"); envURL != "" {
-		cfg.Ship.URL = envURL
 	}
 
 	return cfg
