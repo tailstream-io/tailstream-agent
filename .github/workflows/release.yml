@@ -33,6 +33,7 @@ jobs:
           dist/tailstream-agent-linux-amd64
           dist/tailstream-agent-linux-arm64
           dist/checksums.txt
+          install.sh
         generate_release_notes: true
         draft: false
         prerelease: false

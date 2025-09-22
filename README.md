@@ -4,7 +4,24 @@ A lightweight Go agent that automatically discovers and parses common web server
 
 ## ⚡ Quick Start
 
-### Simple Installation
+### One-Liner Installation (Recommended)
+
+Install and set up the agent as a system service with a single command:
+
+```bash
+curl https://install.tailstream.io | sudo bash
+```
+
+This will:
+- Download the correct binary for your Linux architecture (x86_64/ARM64)
+- Install to `/usr/local/bin/tailstream-agent`
+- Create a dedicated `tailstream` user
+- Set up log file permissions (ACL preferred, group fallback)
+- Set up a systemd service that starts on boot
+- Run the interactive setup wizard
+- Start the service automatically
+
+### Manual Installation
 
 1. **Download** the binary for your platform:
    - **Linux (x86_64)**: [tailstream-agent-linux-amd64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-linux-amd64)
@@ -48,6 +65,40 @@ After setup, simply run:
 ```bash
 ./tailstream-agent-linux-amd64          # Normal operation
 ./tailstream-agent-linux-amd64 --debug  # With debug output
+```
+
+### Service Management (One-Liner Installation)
+
+If you used the one-liner installer, the agent runs as a systemd service:
+
+```bash
+# Service status and control
+sudo systemctl status tailstream-agent     # Check service status
+sudo systemctl stop tailstream-agent       # Stop the service
+sudo systemctl start tailstream-agent      # Start the service
+sudo systemctl restart tailstream-agent    # Restart the service
+
+# View logs
+sudo journalctl -u tailstream-agent -f     # Follow live logs
+sudo journalctl -u tailstream-agent        # View all logs
+
+# Configuration
+sudo nano /etc/tailstream/agent.yaml       # Edit configuration
+
+# Uninstall
+curl https://install.tailstream.io | sudo bash -s -- --uninstall
+```
+
+### Log File Permissions
+
+The installer automatically grants the `tailstream` user access to common log directories:
+
+- **ACL method** (preferred): Precise permissions only for specific log files
+- **Group method** (fallback): Adds user to `adm` group for broader log access
+
+Grant access to additional logs:
+```bash
+sudo setfacl -m u:tailstream:r /path/to/custom.log
 ```
 
 ## Configuration
