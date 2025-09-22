@@ -219,8 +219,8 @@ verify_log_access() {
 create_config_dir() {
     print_status "Creating config directory..."
     mkdir -p "$CONFIG_DIR"
-    chown root:$USER_NAME "$CONFIG_DIR"
-    chmod 750 "$CONFIG_DIR"
+    chown $USER_NAME:$USER_NAME "$CONFIG_DIR"
+    chmod 755 "$CONFIG_DIR"
 }
 
 # Create systemd service
@@ -263,51 +263,29 @@ EOF
 
 # Run setup wizard
 run_setup() {
-    print_status "Running initial setup..."
-
-    # Create a temporary config to run setup as root, then fix ownership
-    export TAILSTREAM_CONFIG_PATH="$CONFIG_DIR/agent.yaml"
-
-    if [[ -f "$CONFIG_DIR/agent.yaml" ]]; then
-        print_warning "Configuration already exists at $CONFIG_DIR/agent.yaml"
-        read -p "Do you want to reconfigure? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            return
-        fi
-    fi
-
-    # Run setup
-    "$INSTALL_DIR/$BINARY_NAME"
-
-    # Fix ownership and permissions
-    if [[ -f "$CONFIG_DIR/agent.yaml" ]]; then
-        chown root:$USER_NAME "$CONFIG_DIR/agent.yaml"
-        chmod 640 "$CONFIG_DIR/agent.yaml"
-    fi
+    print_status "Skipping automatic setup to avoid terminal issues..."
+    print_status "You'll need to run the setup wizard manually after installation"
 }
 
-# Start and enable service
-start_service() {
-    print_status "Starting and enabling tailstream-agent service..."
+# Enable service (but don't start until configured)
+enable_service() {
+    print_status "Enabling tailstream-agent service..."
     systemctl enable tailstream-agent
-    systemctl start tailstream-agent
-
-    # Wait a moment and check status
-    sleep 2
-    if systemctl is-active --quiet tailstream-agent; then
-        print_success "Service started successfully"
-    else
-        print_error "Service failed to start"
-        print_status "Check logs with: journalctl -u tailstream-agent -f"
-        exit 1
-    fi
+    print_success "Service enabled - will start automatically after configuration"
 }
 
 # Show completion message
 show_completion() {
     echo
     print_success "🎉 Tailstream Agent installed successfully!"
+    echo
+    print_status "⚡ Next Steps:"
+    echo "  1. Run the setup wizard as the tailstream user:"
+    echo "     sudo -u $USER_NAME $INSTALL_DIR/$BINARY_NAME"
+    echo
+    echo "  2. Enter your Stream ID and Access Token when prompted"
+    echo
+    echo "  3. The service will automatically start after configuration"
     echo
     echo "Service Management:"
     echo "  sudo systemctl status tailstream-agent    # Check status"
@@ -407,7 +385,7 @@ main() {
     create_service
     run_setup
     verify_log_access
-    start_service
+    enable_service
     show_completion
 }
 

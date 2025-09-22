@@ -18,8 +18,12 @@ This will:
 - Create a dedicated `tailstream` user
 - Set up log file permissions (ACL preferred, group fallback)
 - Set up a systemd service that starts on boot
-- Run the interactive setup wizard
-- Start the service automatically
+- Enable the service (ready to start after configuration)
+
+After installation, run the setup wizard:
+```bash
+sudo -u tailstream tailstream-agent
+```
 
 ### Manual Installation
 
