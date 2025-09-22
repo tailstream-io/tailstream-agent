@@ -27,6 +27,11 @@ go.work.sum
 # env file
 .env
 
+# Build directories
+dist/
+dist-*/
+
 # Editor/IDE
 # .idea/
 # .vscode/
+.claude/settings.local.json
