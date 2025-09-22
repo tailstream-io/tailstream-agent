@@ -84,7 +84,7 @@ check_systemd() {
 # Get latest release info
 get_latest_release() {
     local api_url="https://api.github.com/repos/$REPO/releases/latest"
-    curl -s "$api_url" | grep -o '"tag_name": "[^"]*"' | grep -o '[^"]*$'
+    curl -s "$api_url" | grep '"tag_name"' | sed 's/.*"tag_name": "\([^"]*\)".*/\1/'
 }
 
 # Download and verify binary
