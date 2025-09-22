@@ -7,9 +7,9 @@ A lightweight Go agent that automatically discovers and parses common web server
 ### Simple Installation
 
 1. **Download** the binary for your platform:
-   - **Linux (x86_64)**: [tailstream-agent-linux-amd64](https://github.com/your-username/tailstream-agent/releases/latest/download/tailstream-agent-linux-amd64)
-   - **Linux (ARM64)**: [tailstream-agent-linux-arm64](https://github.com/your-username/tailstream-agent/releases/latest/download/tailstream-agent-linux-arm64)
-   - **All releases**: [GitHub Releases](https://github.com/your-username/tailstream-agent/releases)
+   - **Linux (x86_64)**: [tailstream-agent-linux-amd64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-linux-amd64)
+   - **Linux (ARM64)**: [tailstream-agent-linux-arm64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-linux-arm64)
+   - **All releases**: [GitHub Releases](https://github.com/tailstream-io/tailstream-agent/releases)
 2. **Make executable and run setup** (first time only):
    ```bash
    chmod +x tailstream-agent-linux-amd64
