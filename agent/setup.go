@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -15,13 +17,23 @@ func setupWizard() error {
 	fmt.Println("Let's get you set up! This wizard will create a config file for easy future use.")
 	fmt.Println()
 
+	scanner := bufio.NewScanner(os.Stdin)
+
 	var streamID, accessToken string
 
 	fmt.Print("Enter your Tailstream Stream ID: ")
-	fmt.Scanln(&streamID)
+	if scanner.Scan() {
+		streamID = strings.TrimSpace(scanner.Text())
+	}
 
 	fmt.Print("Enter your Tailstream Access Token: ")
-	fmt.Scanln(&accessToken)
+	if scanner.Scan() {
+		accessToken = strings.TrimSpace(scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading input: %v", err)
+	}
 
 	if streamID == "" || accessToken == "" {
 		return fmt.Errorf("both Stream ID and Access Token are required")
