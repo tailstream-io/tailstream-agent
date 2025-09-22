@@ -11,6 +11,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -162,38 +164,144 @@ func tailFile(ctx context.Context, file string, ch chan<- LogLine) {
 // Event is the normalized record to send to Tailstream.
 type Event map[string]interface{}
 
-// parseLine normalizes a log line. Currently only JSON lines are parsed.
-func parseLine(ll LogLine, env, host string) (Event, bool) {
-	var m map[string]interface{}
-	if err := json.Unmarshal([]byte(ll.Line), &m); err == nil {
-		m["env"] = env
-		m["host"] = host
-		m["file"] = ll.File
-		return m, true
-	}
-	// fallback raw line
-	return Event{
-		"env":  env,
-		"host": host,
-		"file": ll.File,
-		"line": ll.Line,
-	}, true
+// AccessLogEntry represents a parsed access log entry
+type AccessLogEntry struct {
+	Host      string  `json:"host"`
+	Path      string  `json:"path"`
+	Method    string  `json:"method"`
+	Status    int     `json:"status"`
+	RT        float64 `json:"rt"`
+	Bytes     int64   `json:"bytes"`
+	Src       string  `json:"src"`
+	IP        string  `json:"ip,omitempty"`
+	UserAgent string  `json:"user_agent,omitempty"`
+	TS        int64   `json:"ts,omitempty"`
 }
 
-// shipEvents POSTs a batch of events to Tailstream ingest endpoint.
+// Common access log format patterns
+var (
+	// Apache/Nginx Common Log Format: IP - - [timestamp] "METHOD path HTTP/version" status bytes
+	commonLogRegex = regexp.MustCompile(`^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*) HTTP/[^"]*" (\d+) (\S+)`)
+
+	// Apache/Nginx Combined Log Format (includes referer and user-agent)
+	combinedLogRegex = regexp.MustCompile(`^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*) HTTP/[^"]*" (\d+) (\S+) "([^"]*)" "([^"]*)"`)
+
+	// Nginx with response time: IP - - [timestamp] "METHOD path HTTP/version" status bytes "referer" "user-agent" rt
+	nginxWithRTRegex = regexp.MustCompile(`^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*) HTTP/[^"]*" (\d+) (\S+) "([^"]*)" "([^"]*)" ([0-9.]+)`)
+)
+
+// parseAccessLog attempts to parse common access log formats
+func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
+	// Try nginx with response time first (most detailed)
+	if matches := nginxWithRTRegex.FindStringSubmatch(line); matches != nil {
+		status, _ := strconv.Atoi(matches[5])
+		bytes, _ := strconv.ParseInt(matches[6], 10, 64)
+		rt, _ := strconv.ParseFloat(matches[9], 64)
+
+		return &AccessLogEntry{
+			Host:      hostname,
+			Path:      matches[4],
+			Method:    matches[3],
+			Status:    status,
+			RT:        rt,
+			Bytes:     bytes,
+			Src:       filename,
+			IP:        matches[1],
+			UserAgent: matches[8],
+		}, true
+	}
+
+	// Try combined log format
+	if matches := combinedLogRegex.FindStringSubmatch(line); matches != nil {
+		status, _ := strconv.Atoi(matches[5])
+		bytes, _ := strconv.ParseInt(matches[6], 10, 64)
+
+		return &AccessLogEntry{
+			Host:      hostname,
+			Path:      matches[4],
+			Method:    matches[3],
+			Status:    status,
+			RT:        0.0, // No response time in combined format
+			Bytes:     bytes,
+			Src:       filename,
+			IP:        matches[1],
+			UserAgent: matches[8],
+		}, true
+	}
+
+	// Try common log format
+	if matches := commonLogRegex.FindStringSubmatch(line); matches != nil {
+		status, _ := strconv.Atoi(matches[5])
+		bytes, _ := strconv.ParseInt(matches[6], 10, 64)
+
+		return &AccessLogEntry{
+			Host:   hostname,
+			Path:   matches[4],
+			Method: matches[3],
+			Status: status,
+			RT:     0.0, // No response time in common format
+			Bytes:  bytes,
+			Src:    filename,
+			IP:     matches[1],
+		}, true
+	}
+
+	return nil, false
+}
+
+// parseLine normalizes a log line into the required Tailstream format
+func parseLine(ll LogLine, env, host string) (Event, bool) {
+	// Try to parse as JSON first
+	var m map[string]interface{}
+	if err := json.Unmarshal([]byte(ll.Line), &m); err == nil {
+		// Ensure required fields are present
+		if _, hasHost := m["host"]; !hasHost {
+			m["host"] = host
+		}
+		if _, hasSrc := m["src"]; !hasSrc {
+			m["src"] = ll.File
+		}
+		return m, true
+	}
+
+	// Try to parse as access log
+	if entry, ok := parseAccessLog(ll.Line, ll.File, host); ok {
+		// Convert to Event map
+		data, _ := json.Marshal(entry)
+		var event Event
+		json.Unmarshal(data, &event)
+		return event, true
+	}
+
+	// Skip unparseable lines
+	if os.Getenv("DEBUG") == "1" {
+		log.Printf("Skipping unparseable line from %s: %s", ll.File, ll.Line)
+	}
+	return nil, false
+}
+
+// shipEvents POSTs a batch of events to Tailstream ingest endpoint as NDJSON.
 func shipEvents(ctx context.Context, cfg Config, events []Event) error {
 	if cfg.Ship.URL == "" {
 		return fmt.Errorf("ship URL not configured")
 	}
-	data, err := json.Marshal(events)
+
+	// Convert events to NDJSON format
+	var buf bytes.Buffer
+	for _, event := range events {
+		data, err := json.Marshal(event)
+		if err != nil {
+			continue
+		}
+		buf.Write(data)
+		buf.WriteByte('\n')
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.Ship.URL, &buf)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.Ship.URL, bytes.NewReader(data))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-ndjson")
 	if cfg.Key != "" {
 		req.Header.Set("Authorization", "Bearer "+cfg.Key)
 	}
@@ -202,10 +310,17 @@ func shipEvents(ctx context.Context, cfg Config, events []Event) error {
 	if err != nil {
 		return err
 	}
-	io.Copy(io.Discard, resp.Body)
+
+	// Read response body for better error reporting
+	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
+
+	if os.Getenv("DEBUG") == "1" {
+		log.Printf("HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("ship: %s", resp.Status)
+		return fmt.Errorf("ship: %s - %s", resp.Status, string(body))
 	}
 	return nil
 }
@@ -256,8 +371,11 @@ func main() {
 				log.Printf("Processing line from %s: %s", ll.File, ll.Line)
 			}
 			ev, ok := parseLine(ll, cfg.Env, host)
-			if ok {
+			if ok && ev != nil {
 				batch = append(batch, ev)
+				if os.Getenv("DEBUG") == "1" {
+					log.Printf("Parsed event: %+v", ev)
+				}
 				if len(batch) >= 100 {
 					if os.Getenv("DEBUG") == "1" {
 						log.Printf("Batch full, shipping %d events", len(batch))
