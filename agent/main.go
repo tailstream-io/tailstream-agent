@@ -59,6 +59,7 @@ func loadConfig() Config {
 	envFlag := flag.String("env", "", "environment")
 	keyFile := flag.String("key-file", "", "path to key file")
 	shipURL := flag.String("ship-url", "", "ship URL")
+	debug := flag.Bool("debug", false, "enable debug output")
 	flag.Parse()
 
 	if configFile != "" {
@@ -77,6 +78,12 @@ func loadConfig() Config {
 			cfg.Key = strings.TrimSpace(string(b))
 		}
 	}
+
+	// Store debug flag in environment for access elsewhere
+	if *debug {
+		os.Setenv("DEBUG", "1")
+	}
+
 	return cfg
 }
 
@@ -207,12 +214,24 @@ func main() {
 	cfg := loadConfig()
 	host, _ := os.Hostname()
 
+	if os.Getenv("DEBUG") == "1" {
+		log.Printf("Starting tailstream agent (env=%s, key=%s, url=%s)",
+			cfg.Env,
+			cfg.Key[:min(len(cfg.Key), 10)]+"...",
+			cfg.Ship.URL)
+	}
+
 	files, err := discover(cfg)
 	if err != nil {
 		log.Fatalf("discover: %v", err)
 	}
 	if len(files) == 0 {
 		log.Println("no log files discovered")
+		return
+	}
+
+	if os.Getenv("DEBUG") == "1" {
+		log.Printf("Found %d log files: %v", len(files), files)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -233,20 +252,33 @@ func main() {
 	for {
 		select {
 		case ll := <-lines:
+			if os.Getenv("DEBUG") == "1" {
+				log.Printf("Processing line from %s: %s", ll.File, ll.Line)
+			}
 			ev, ok := parseLine(ll, cfg.Env, host)
 			if ok {
 				batch = append(batch, ev)
 				if len(batch) >= 100 {
+					if os.Getenv("DEBUG") == "1" {
+						log.Printf("Batch full, shipping %d events", len(batch))
+					}
 					if err := shipEvents(ctx, cfg, batch); err != nil {
 						log.Printf("ship: %v", err)
+					} else if os.Getenv("DEBUG") == "1" {
+						log.Printf("Successfully shipped batch of %d events", len(batch))
 					}
 					batch = batch[:0]
 				}
 			}
 		case <-ticker.C:
 			if len(batch) > 0 {
+				if os.Getenv("DEBUG") == "1" {
+					log.Printf("Timer tick, shipping %d events", len(batch))
+				}
 				if err := shipEvents(ctx, cfg, batch); err != nil {
 					log.Printf("ship: %v", err)
+				} else if os.Getenv("DEBUG") == "1" {
+					log.Printf("Successfully shipped %d events", len(batch))
 				}
 				batch = batch[:0]
 			}
