@@ -1,68 +1,60 @@
 # Tailstream Agent
 
-A lightweight Go agent that automatically discovers common web server logs, normalizes them into JSON format, and ships batches of records to the Tailstream ingest API for real-time log analysis.
+A lightweight Go agent that automatically discovers and parses common web server access logs, converting them to structured JSON format and shipping them to the Tailstream ingest API for real-time log analysis.
 
-## Quick Start
+## ⚡ Quick Start
 
-### Prerequisites
+### Simple Installation
 
-- Go 1.22+ (for building from source)
-- A Tailstream API key (`ts_live_xxx` or `ts_test_xxx`)
+1. **Download** the binary for your platform from [Releases](https://github.com/your-username/tailstream-agent/releases)
+2. **Run the setup wizard** (first time only):
+   ```bash
+   ./tailstream-agent-linux-amd64
+   ```
+3. **Enter your Stream ID and Access Token** when prompted
+4. **Done!** The agent will automatically discover and stream your logs
 
-### Installation
-
-#### Building from Source
+### Building from Source
 
 ```bash
+# Build for Linux
+./build-linux.sh
+
+# Or build manually
 cd agent
 go build -o tailstream-agent
 ```
 
-#### Docker
+### First Run Setup
 
-Build the Docker image:
+When you run the agent for the first time, it will automatically launch an interactive setup wizard:
 
-```bash
-docker build -t tailstream-agent ./agent
+```
+🚀 Tailstream Agent Setup
+Let's get you set up! This wizard will create a config file for easy future use.
+
+Enter your Tailstream Stream ID: 0199289c-bb03-7275-9529-bee5e9ee1d02
+Enter your Tailstream Access Token: your-access-token
+
+✅ Configuration saved to tailstream.yaml
+🎉 Setup complete! You can now run the agent without any arguments.
 ```
 
-### Basic Usage
-
-Set your Tailstream API key and run the agent:
-
+After setup, simply run:
 ```bash
-export TAILSTREAM_KEY=ts_live_your_api_key_here
-./tailstream-agent
+./tailstream-agent-linux-amd64          # Normal operation
+./tailstream-agent-linux-amd64 --debug  # With debug output
 ```
-
-The agent will automatically discover and tail common web server log files.
 
 ## Configuration
 
-### Environment Variables
+### Configuration File (tailstream.yaml)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TAILSTREAM_KEY` | - | **Required.** Your Tailstream API key |
-| `TAILSTREAM_ENV` | `production` | Environment label added to all log events |
-| `TAILSTREAM_URL` | `https://ingest.tailstream.com/v1/batch` | Tailstream ingest endpoint URL |
-
-### Command Line Flags
-
-| Flag | Description |
-|------|-------------|
-| `--config` | Path to YAML configuration file |
-| `--env` | Override environment label |
-| `--key-file` | Path to file containing API key |
-| `--ship-url` | Override ingest endpoint URL |
-
-### Configuration File
-
-Create a YAML configuration file to customize agent behavior:
+After running the setup wizard, a `tailstream.yaml` file is created with your configuration:
 
 ```yaml
 env: production
-
+key: your-access-token
 discovery:
   enabled: true
   paths:
@@ -72,15 +64,80 @@ discovery:
       - "/var/log/apache2/*.log"
       - "/var/log/httpd/*.log"
       - "/var/www/**/storage/logs/*.log"
-      - "/custom/path/*.log"
     exclude:
       - "**/*.gz"
       - "**/*.1"
+ship:
+  url: "https://app.tailstream.io/api/ingest/your-stream-id"
+  stream_id: "your-stream-id"
+```
+
+### Multi-Stream Configuration
+
+For advanced setups, you can configure multiple Tailstream destinations with different log sources:
+
+```yaml
+env: production
+key: default-access-token  # Global fallback token
+
+# Multi-stream configuration
+streams:
+  - name: "nginx-logs"
+    stream_id: "stream-id-1"  # URL auto-constructed: https://app.tailstream.io/api/ingest/stream-id-1
+    paths:
+      - "/var/log/nginx/*.log"
+      - "/var/log/nginx/sites/*access.log"
+    exclude:
+      - "**/*.gz"
+      - "**/*.1"
+    # Optional: stream-specific access token
+    # key: "stream-specific-token"
+
+  - name: "application-logs"
+    stream_id: "stream-id-2"
+    key: "different-access-token"  # This stream uses its own token
+    paths:
+      - "/var/www/*/storage/logs/*.log"
+      - "/opt/app/logs/*.log"
+    exclude:
       - "**/*.old"
 
-ship:
-  url: "https://ingest.tailstream.com/v1/batch"
+  - name: "system-logs"
+    stream_id: "stream-id-3"
+    # Uses global 'key' since no stream-specific key provided
+    paths:
+      - "/var/log/syslog*"
+      - "/var/log/auth.log"
 ```
+
+#### Multi-Stream Benefits
+
+- **Separate destinations**: Send different log types to different Tailstream streams
+- **Independent access control**: Use different access tokens per stream
+- **Organized log routing**: Route nginx logs, application logs, and system logs separately
+- **Flexible patterns**: Each stream can have its own include/exclude patterns
+- **Backward compatible**: Existing single-stream configs continue to work
+
+### Manual Configuration
+
+If you prefer not to use the setup wizard, you can configure the agent manually:
+
+#### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TAILSTREAM_KEY` | - | Your Tailstream access token |
+| `TAILSTREAM_ENV` | `production` | Environment label |
+| `TAILSTREAM_URL` | - | Full ingest endpoint URL |
+
+#### Command Line Flags
+
+| Flag | Description |
+|------|-------------|
+| `--config` | Path to YAML configuration file (default: tailstream.yaml) |
+| `--env` | Override environment label |
+| `--ship-url` | Override ingest endpoint URL |
+| `--debug` | Enable verbose debug output |
 
 #### Configuration Options
 
@@ -107,54 +164,78 @@ ship:
 
 ### Usage Examples
 
-#### Basic usage with environment variable:
+#### Recommended - Setup wizard (first time):
 ```bash
-TAILSTREAM_KEY=ts_live_xxx ./tailstream-agent
+./tailstream-agent-linux-amd64
+# Follow the interactive prompts
 ```
 
-#### With custom configuration file:
+#### Subsequent runs:
 ```bash
-TAILSTREAM_KEY=ts_live_xxx ./tailstream-agent --config /etc/tailstream/agent.yaml
+./tailstream-agent-linux-amd64          # Normal operation
+./tailstream-agent-linux-amd64 --debug  # With debug output
 ```
 
-#### Using key file and custom environment:
+#### Manual configuration with environment variables:
 ```bash
-./tailstream-agent --key-file /etc/tailstream/key.txt --env staging
+TAILSTREAM_KEY=your-access-token \
+TAILSTREAM_URL=https://app.tailstream.io/api/ingest/your-stream-id \
+./tailstream-agent-linux-amd64
+```
+
+#### Using custom configuration file:
+```bash
+./tailstream-agent-linux-amd64 --config /etc/tailstream/agent.yaml
 ```
 
 #### Docker usage:
 ```bash
-docker run -e TAILSTREAM_KEY=ts_live_xxx \
+docker run -e TAILSTREAM_KEY=your-token \
+  -e TAILSTREAM_URL=https://app.tailstream.io/api/ingest/your-stream-id \
   -v /var/log:/var/log:ro \
   tailstream-agent
-```
-
-#### Docker with custom config:
-```bash
-docker run -e TAILSTREAM_KEY=ts_live_xxx \
-  -v /var/log:/var/log:ro \
-  -v /path/to/config.yaml:/config.yaml \
-  tailstream-agent --config /config.yaml
 ```
 
 ## How It Works
 
 1. **Discovery**: The agent scans filesystem paths using glob patterns to find log files
 2. **Tailing**: Continuously monitors discovered files for new lines (similar to `tail -f`)
-3. **Parsing**: Attempts to parse each line as JSON; falls back to raw text if parsing fails
-4. **Enrichment**: Adds metadata (environment, hostname, source file) to each log entry
+3. **Parsing**: Intelligently parses common access log formats into structured JSON
+4. **Normalization**: Converts all logs to Tailstream's required NDJSON format
 5. **Batching**: Collects up to 100 events or waits 2 seconds before shipping
-6. **Shipping**: Sends batches via HTTP POST to Tailstream ingest API
+6. **Shipping**: Sends batches via HTTP POST to Tailstream ingest API as NDJSON
 
-### Log Format Support
+### Supported Log Formats
 
-- **JSON logs**: Parsed and forwarded with original structure intact
-- **Plain text logs**: Wrapped in JSON with the raw line in a `line` field
+The agent automatically detects and parses:
 
-All logs are enriched with:
-- `env`: Environment label
-- `host`: Hostname where agent is running
-- `file`: Source log file path
+#### **Access Logs** (converted to structured JSON)
+- **Nginx Combined Format**: `IP - - [timestamp] "METHOD path HTTP/version" status bytes "referer" "user-agent"`
+- **Nginx with Response Time**: Same as above + response time at the end
+- **Apache Common Format**: `IP - - [timestamp] "METHOD path HTTP/version" status bytes`
+- **Apache Combined Format**: Common format + referer and user-agent
+
+#### **JSON Logs**
+- Pre-structured JSON logs are validated and forwarded with required fields
+
+#### **Output Format**
+All logs are converted to this structured format required by Tailstream:
+```json
+{
+  "host": "server-hostname",
+  "path": "/api/endpoint",
+  "method": "GET",
+  "status": 200,
+  "rt": 0.123,
+  "bytes": 1024,
+  "src": "/var/log/nginx/access.log",
+  "ip": "192.168.1.1",
+  "user_agent": "Mozilla/5.0..."
+}
+```
+
+**Required Fields:** `host`, `path`, `method`, `status`, `rt`, `bytes`, `src`
+**Optional Fields:** `ip`, `user_agent`, `ts`
 
 ## Testing
 

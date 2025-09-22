@@ -44,14 +44,14 @@ func TestBinaryInstallation(t *testing.T) {
 		t.Fatalf("create log: %v", err)
 	}
 
-	cfg := []byte("ship:\n  url: '" + srv.URL + "'\ndiscovery:\n  paths:\n    include:\n      - '" + filepath.Join(logDir, "*.log") + "'\n")
+	cfg := []byte("ship:\n  url: '" + srv.URL + "'\n  stream_id: 'test'\nkey: 'dummy'\ndiscovery:\n  paths:\n    include:\n      - '" + filepath.Join(logDir, "*.log") + "'\n")
 	cfgFile := filepath.Join(tmp, "agent.yaml")
 	if err := os.WriteFile(cfgFile, cfg, 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, bin, "--config", cfgFile)
+	cmd := exec.CommandContext(ctx, bin, "--config", cfgFile, "--debug")
 	cmd.Env = append(os.Environ(), "TAILSTREAM_KEY=dummy")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -64,19 +64,45 @@ func TestBinaryInstallation(t *testing.T) {
 		cmd.Wait()
 	}()
 
-	// Append a JSON line after the agent starts tailing
-	time.Sleep(300 * time.Millisecond)
-	appendFile(t, logFile, "{\"msg\":\"hi\"}\n")
+	// Append an access log line after the agent starts tailing
+	time.Sleep(1 * time.Second) // Give more time for the agent to start tailing
+	appendFile(t, logFile, `192.168.1.1 - - [01/Jan/2025:12:00:00 +0000] "GET /test HTTP/1.1" 200 1234 "https://example.com" "TestAgent/1.0"`+"\n")
+
+	// Give some time for the log to be processed
+	time.Sleep(100 * time.Millisecond)
 
 	select {
 	case data := <-received:
-		var events []map[string]any
-		if err := json.Unmarshal(data, &events); err != nil {
-			t.Fatalf("bad payload: %v", err)
+		// Data should be in NDJSON format (newline-delimited JSON)
+		lines := bytes.Split(bytes.TrimSpace(data), []byte("\n"))
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 NDJSON line, got %d", len(lines))
 		}
-		if len(events) != 1 {
-			t.Fatalf("expected 1 event, got %d", len(events))
+
+		var event map[string]any
+		if err := json.Unmarshal(lines[0], &event); err != nil {
+			t.Fatalf("bad NDJSON payload: %v", err)
 		}
+
+		// Verify required fields are present
+		requiredFields := []string{"host", "path", "method", "status", "rt", "bytes", "src"}
+		for _, field := range requiredFields {
+			if _, ok := event[field]; !ok {
+				t.Fatalf("missing required field %s in event: %v", field, event)
+			}
+		}
+
+		// Verify some specific values
+		if event["path"] != "/test" {
+			t.Errorf("expected path '/test', got %v", event["path"])
+		}
+		if event["method"] != "GET" {
+			t.Errorf("expected method 'GET', got %v", event["method"])
+		}
+		if event["status"] != float64(200) { // JSON numbers are float64
+			t.Errorf("expected status 200, got %v", event["status"])
+		}
+
 	case <-time.After(5 * time.Second):
 		t.Fatalf("agent did not ship logs:\n%s", out.String())
 	}
