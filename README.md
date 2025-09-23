@@ -1,6 +1,6 @@
 # Tailstream Agent
 
-A lightweight Go agent that automatically discovers and parses common web server access logs, converting them to structured JSON format and shipping them to the Tailstream ingest API for real-time log[...]
+A lightweight Go agent that automatically discovers and parses common web server access logs, converting them to structured JSON format and shipping them to the Tailstream ingest API for real-time log analysis.
 
 ## ⚡ Quick Start
 
