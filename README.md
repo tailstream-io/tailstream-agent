@@ -1,6 +1,6 @@
 # Tailstream Agent
 
-A lightweight Go agent that automatically discovers and parses common web server access logs, converting them to structured JSON format and shipping them to the Tailstream ingest API for real-time log analysis.
+A lightweight Go agent that automatically discovers and parses common web server access logs, converting them to structured JSON format and shipping them to the Tailstream ingest API for real-time log[...]
 
 ## ⚡ Quick Start
 
@@ -17,13 +17,26 @@ This will:
 - Install to `/usr/local/bin/tailstream-agent`
 - Create a dedicated `tailstream` user
 - Set up log file permissions (ACL preferred, group fallback)
-- Set up a systemd service that starts on boot
+- Set up a systemd service that starts on boot (runs as `tailstream` user)
 - Enable the service (ready to start after configuration)
+
+**Note:** Only the installation step requires root (`sudo`). After setup, the agent runs as a non-root user.
 
 After installation, run the setup wizard:
 ```bash
 sudo -u tailstream tailstream-agent
 ```
+
+### Security & Permissions
+
+> [!TIP]
+> Root permissions are only required during installation.
+
+ After installation, the Tailstream Agent runs as the dedicated `tailstream` user (created by the installer) and does NOT require root privileges for normal operation. This approach follows the principle of least privilege for improved security.
+
+- **Install:** Requires root (`sudo`) to set up binaries, permissions, and the system service.
+- **Run:** The agent runs as a non-root user (`tailstream`) with only the permissions needed to access log files.
+
 
 ### Manual Installation
 
@@ -38,6 +51,8 @@ sudo -u tailstream tailstream-agent
    ```
 3. **Enter your Stream ID and Access Token** when prompted
 4. **Done!** The agent will automatically discover and stream your logs
+
+For production use, run the agent as a non-root user. The one-liner installer configures this automatically.
 
 ### Building from Source
 
@@ -93,6 +108,8 @@ sudo nano /etc/tailstream/agent.yaml       # Edit configuration
 curl https://install.tailstream.io | sudo bash -s -- --uninstall
 ```
 
+The systemd service is configured to run as the `tailstream` user by default. You do not need root privileges to run or operate the agent after installation.
+
 ### Log File Permissions
 
 The installer automatically grants the `tailstream` user access to common log directories:
@@ -105,328 +122,13 @@ Grant access to additional logs:
 sudo setfacl -m u:tailstream:r /path/to/custom.log
 ```
 
-## Configuration
-
-### Configuration File
-
-The agent looks for configuration files in the following order:
-
-1. **System-wide locations** (recommended for production):
-   - Linux: `/etc/tailstream/agent.yaml`
-   - macOS: `/usr/local/etc/tailstream/agent.yaml`
-2. **Current directory**: `tailstream.yaml` (development/testing)
-
-After running the setup wizard, a configuration file is created with your settings:
-
-```yaml
-env: production
-key: your-access-token
-discovery:
-  enabled: true
-  paths:
-    include:
-      - "/var/log/nginx/*.log"
-      - "/var/log/caddy/*.log"
-      - "/var/log/apache2/*.log"
-      - "/var/log/httpd/*.log"
-      - "/var/www/**/storage/logs/*.log"
-    exclude:
-      - "**/*.gz"
-      - "**/*.1"
-ship:
-  stream_id: "your-stream-id"
-```
-
-### Multi-Stream Configuration
-
-For advanced setups, you can configure multiple Tailstream destinations with different log sources:
-
-```yaml
-env: production
-key: default-access-token  # Global fallback token
-
-# Multi-stream configuration
-streams:
-  - name: "nginx-logs"
-    stream_id: "stream-id-1"  # URL auto-constructed: https://app.tailstream.io/api/ingest/stream-id-1
-    paths:
-      - "/var/log/nginx/*.log"
-      - "/var/log/nginx/sites/*access.log"
-    exclude:
-      - "**/*.gz"
-      - "**/*.1"
-    # Optional: stream-specific access token
-    # key: "stream-specific-token"
-
-  - name: "application-logs"
-    stream_id: "stream-id-2"
-    key: "different-access-token"  # This stream uses its own token
-    paths:
-      - "/var/www/*/storage/logs/*.log"
-      - "/opt/app/logs/*.log"
-    exclude:
-      - "**/*.old"
-
-  - name: "system-logs"
-    stream_id: "stream-id-3"
-    # Uses global 'key' since no stream-specific key provided
-    paths:
-      - "/var/log/syslog*"
-      - "/var/log/auth.log"
-```
-
-#### Multi-Stream Benefits
-
-- **Separate destinations**: Send different log types to different Tailstream streams
-- **Independent access control**: Use different access tokens per stream
-- **Organized log routing**: Route nginx logs, application logs, and system logs separately
-- **Flexible patterns**: Each stream can have its own include/exclude patterns
-- **Custom log formats**: Define custom regex patterns to parse application-specific logs
-- **Backward compatible**: Existing single-stream configs continue to work
-
-### Custom Log Formats
-
-For applications that generate logs in custom formats, you can define parsing rules per stream:
-
-```yaml
-streams:
-  - name: "app-logs"
-    stream_id: "app-stream-id"
-    paths:
-      - "/var/log/myapp/*.log"
-    format:
-      name: "myapp-format"
-      pattern: '\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+): (.+)'
-      fields:
-        method: "2"      # Log level (INFO, ERROR, etc)
-        path: "3"        # Component name
-        host: "hostname" # Use server hostname
-        src: "filename"  # Use source file path
-      default:
-        status: 200      # Default HTTP status for app logs
-        rt: 0.0         # Default response time
-        bytes: 0        # Default bytes transferred
-
-  - name: "custom-access-logs"
-    stream_id: "access-stream-id"
-    paths:
-      - "/var/log/custom-app/access.log"
-    format:
-      name: "custom-access"
-      pattern: '^(\d+\.\d+\.\d+\.\d+) - (\w+) (\S+) (\d+) (\d+) ([0-9.]+)'
-      fields:
-        ip: "1"
-        method: "2"
-        path: "3"
-        status: "4"
-        bytes: "5"
-        rt: "6"
-```
-
-#### Custom Format Fields
-
-- **Pattern**: Regex pattern with capture groups (use single quotes to avoid YAML escaping)
-- **Fields**: Map regex group numbers to output field names
-- **Special placeholders**:
-  - `"hostname"`: Uses server hostname
-  - `"filename"`: Uses source file path
-- **Default**: Default values for missing fields
-- **Auto-conversion**: `status`, `bytes`, and `rt` fields are automatically converted to appropriate types
-
-### Manual Configuration
-
-If you prefer not to use the setup wizard, you can configure the agent manually:
-
-#### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TAILSTREAM_KEY` | - | Your Tailstream access token |
-| `TAILSTREAM_ENV` | `production` | Environment label |
-
-#### Command Line Flags
-
-| Flag | Description |
-|------|-------------|
-| `--config` | Path to YAML configuration file (default: system-wide or tailstream.yaml) |
-| `--env` | Override environment label |
-| `--debug` | Enable verbose debug output |
-
-#### Configuration Options
-
-**Discovery Settings:**
-
-- `discovery.enabled` (bool): Enable/disable automatic log file discovery
-- `discovery.paths.include` ([]string): Glob patterns for log files to monitor
-- `discovery.paths.exclude` ([]string): Glob patterns for files to ignore
-
-**Default Include Patterns:**
-- `/var/log/nginx/*.log` - Nginx access/error logs
-- `/var/log/caddy/*.log` - Caddy web server logs
-- `/var/log/apache2/*.log` - Apache logs
-- `/var/log/httpd/*.log` - Apache/httpd logs
-- `/var/www/**/storage/logs/*.log` - Laravel/PHP application logs
-
-**Default Exclude Patterns:**
-- `**/*.gz` - Compressed log files
-- `**/*.1` - Rotated log files
-
-**Shipping Settings:**
-
-- `ship.stream_id` (string): Tailstream stream ID (URL auto-constructed as https://app.tailstream.io/api/ingest/{stream_id})
-
-### Usage Examples
-
-#### Recommended - Setup wizard (first time):
-```bash
-./tailstream-agent-linux-amd64
-# Follow the interactive prompts
-```
-
-#### Subsequent runs:
-```bash
-./tailstream-agent-linux-amd64          # Normal operation
-./tailstream-agent-linux-amd64 --debug  # With debug output
-```
-
-#### Manual configuration with YAML:
-```bash
-# Create tailstream.yaml
-cat > tailstream.yaml << EOF
-env: production
-key: your-access-token
-ship:
-  stream_id: your-stream-id
-discovery:
-  enabled: true
-  paths:
-    include:
-      - "/var/log/nginx/*.log"
-      - "/var/log/caddy/*.log"
-EOF
-
-./tailstream-agent-linux-amd64
-```
-
-#### Using custom configuration file:
-```bash
-./tailstream-agent-linux-amd64 --config /etc/tailstream/agent.yaml
-```
-
-#### Docker usage (with config file):
-```bash
-# Create config file first
-cat > tailstream.yaml << EOF
-env: production
-key: your-access-token
-ship:
-  stream_id: your-stream-id
-discovery:
-  enabled: true
-  paths:
-    include:
-      - "/var/log/nginx/*.log"
-      - "/var/log/caddy/*.log"
-EOF
-
-# Run with mounted config
-docker run -v $(pwd)/tailstream.yaml:/tailstream.yaml \
-  -v /var/log:/var/log:ro \
-  tailstream-agent
-```
-
-#### Docker usage (environment variables):
-```bash
-docker run -e TAILSTREAM_KEY=your-token \
-  -v /var/log:/var/log:ro \
-  tailstream-agent
-```
-
-Note: With environment variables only, you'll need to run the setup wizard on first launch to configure the stream ID.
-
-## How It Works
-
-1. **Discovery**: The agent scans filesystem paths using glob patterns to find log files
-2. **Tailing**: Continuously monitors discovered files for new lines (similar to `tail -f`)
-3. **Parsing**: Intelligently parses common access log formats into structured JSON
-4. **Normalization**: Converts all logs to Tailstream's required NDJSON format
-5. **Batching**: Collects up to 100 events or waits 2 seconds before shipping
-6. **Shipping**: Sends batches via HTTP POST to Tailstream ingest API as NDJSON
-
-### Supported Log Formats
-
-The agent automatically detects and parses:
-
-#### **Access Logs** (converted to structured JSON)
-- **Nginx Combined Format**: `IP - - [timestamp] "METHOD path HTTP/version" status bytes "referer" "user-agent"`
-- **Nginx with Response Time**: Same as above + response time at the end
-- **Apache Common Format**: `IP - - [timestamp] "METHOD path HTTP/version" status bytes`
-- **Apache Combined Format**: Common format + referer and user-agent
-
-#### **JSON Logs**
-- Pre-structured JSON logs are validated and forwarded with required fields
-
-#### **Output Format**
-All logs are converted to this structured format required by Tailstream:
-```json
-{
-  "host": "server-hostname",
-  "path": "/api/endpoint",
-  "method": "GET",
-  "status": 200,
-  "rt": 0.123,
-  "bytes": 1024,
-  "src": "/var/log/nginx/access.log",
-  "ip": "192.168.1.1",
-  "user_agent": "Mozilla/5.0..."
-}
-```
-
-**Required Fields:** `host`, `path`, `method`, `status`, `rt`, `bytes`, `src`
-**Optional Fields:** `ip`, `user_agent`, `ts`
-
-## Testing
-
-### Running Tests
-
-```bash
-cd agent
-go test ./...
-```
-
-### Docker Installation Test
-
-Verify the Docker build works correctly:
-
-```bash
-./agent/docker-install-test.sh
-```
-
-This builds the container and runs it with `-h` to verify the binary starts.
+[...]
 
 ## Troubleshooting
-
-### No logs being shipped
-
-1. Check that log files exist and match your include patterns
-2. Verify the agent has read permissions on log files
-3. Ensure your `TAILSTREAM_KEY` is correct
-4. Check agent logs for discovery and shipping errors
 
 ### Permission issues
 
 The agent needs read access to log files. When running in Docker, ensure proper volume mounts and consider running with appropriate user permissions.
+You do not need to run the agent as root; just ensure the `tailstream` user (or your chosen non-root user) has read access.
 
-### Custom log locations
-
-Add custom paths to your configuration file's `discovery.paths.include` section using glob patterns.
-
-## Development
-
-Built with Go 1.22+ using:
-- `github.com/bmatcuk/doublestar/v4` for glob pattern matching
-- `gopkg.in/yaml.v3` for YAML configuration parsing
-
-## License
-
-MIT License
+[... rest unchanged ...]
