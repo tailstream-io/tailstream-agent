@@ -1,0 +1,40 @@
+FROM ubuntu:22.04
+
+# Install required packages
+RUN apt-get update && apt-get install -y \
+    curl \
+    sudo \
+    systemctl \
+    acl \
+    nginx \
+    apache2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create some test log files to simulate production
+RUN mkdir -p /var/log/nginx /var/log/apache2 /var/log/httpd /var/log/caddy
+RUN touch /var/log/nginx/access.log /var/log/nginx/error.log
+RUN touch /var/log/apache2/access.log /var/log/apache2/error.log
+RUN touch /var/log/httpd/access_log /var/log/httpd/error_log
+RUN touch /var/log/caddy/access.log
+
+# Add some content to logs to make them realistic
+RUN echo "127.0.0.1 - - [$(date)] \"GET / HTTP/1.1\" 200 612" > /var/log/nginx/access.log
+RUN echo "$(date) [error] test error message" > /var/log/nginx/error.log
+
+# Set typical log file permissions (restrictive, like production)
+RUN chmod 640 /var/log/nginx/*.log
+RUN chmod 640 /var/log/apache2/*.log
+RUN chmod 640 /var/log/httpd/*
+RUN chmod 640 /var/log/caddy/*.log
+RUN chown root:adm /var/log/nginx/*.log
+RUN chown root:adm /var/log/apache2/*.log
+
+# Copy the installer script
+COPY install.sh /tmp/install.sh
+RUN chmod +x /tmp/install.sh
+
+# Create a script to test the bulletproof installer
+RUN echo '#!/bin/bash\nset -e\necho "Testing bulletproof installer..."\ncd /tmp\n./install.sh' > /test-installer.sh
+RUN chmod +x /test-installer.sh
+
+CMD ["/test-installer.sh"]
