@@ -282,7 +282,6 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 - `/var/log/caddy/*.log` - Caddy web server logs
 - `/var/log/apache2/*.log` - Apache logs
 - `/var/log/httpd/*.log` - Apache/httpd logs
-- `/var/www/**/storage/logs/*.log` - Laravel/PHP application logs
 
 **Default Exclude Patterns:**
 - `**/*.gz` - Compressed log files
