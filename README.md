@@ -9,7 +9,7 @@ A lightweight Go agent that automatically discovers and parses common web server
 Install and set up the agent as a system service with a single command:
 
 ```bash
-curl https://install.tailstream.io | sudo bash
+curl -fsSL https://install.tailstream.io | sudo bash
 ```
 
 This will:
