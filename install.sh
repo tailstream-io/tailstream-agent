@@ -14,7 +14,9 @@ NC='\033[0m' # No Color
 
 # Configuration
 REPO="tailstream-io/tailstream-agent"
-INSTALL_DIR="/usr/local/bin"
+OPT_DIR="/opt/tailstream"
+BIN_DIR="$OPT_DIR/bin"
+SYMLINK_PATH="/usr/local/bin/tailstream-agent"
 CONFIG_DIR="/etc/tailstream"
 SERVICE_FILE="/etc/systemd/system/tailstream-agent.service"
 BINARY_NAME="tailstream-agent"
@@ -52,6 +54,65 @@ check_root() {
         fi
     fi
 }
+
+# Uninstall function
+uninstall() {
+    print_status "Uninstalling Tailstream Agent..."
+
+    # Stop and disable service
+    if systemctl is-active --quiet tailstream-agent; then
+        print_status "Stopping tailstream-agent service..."
+        systemctl stop tailstream-agent
+    fi
+
+    if systemctl is-enabled --quiet tailstream-agent 2>/dev/null; then
+        print_status "Disabling tailstream-agent service..."
+        systemctl disable tailstream-agent
+    fi
+
+    # Remove service file
+    if [[ -f "$SERVICE_FILE" ]]; then
+        print_status "Removing systemd service file..."
+        rm -f "$SERVICE_FILE"
+        systemctl daemon-reload
+    fi
+
+    # Remove symlink
+    if [[ -L "$SYMLINK_PATH" ]]; then
+        print_status "Removing binary symlink..."
+        rm -f "$SYMLINK_PATH"
+    fi
+
+    # Remove /opt/tailstream directory
+    if [[ -d "$OPT_DIR" ]]; then
+        print_status "Removing installation directory..."
+        rm -rf "$OPT_DIR"
+    fi
+
+    # Remove configuration directory
+    if [[ -d "$CONFIG_DIR" ]]; then
+        print_status "Removing configuration directory..."
+        rm -rf "$CONFIG_DIR"
+    fi
+
+    # Remove user (only if it exists and has no running processes)
+    if id "$USER_NAME" &>/dev/null; then
+        if ! pgrep -u "$USER_NAME" >/dev/null 2>&1; then
+            print_status "Removing user $USER_NAME..."
+            userdel "$USER_NAME" 2>/dev/null || print_warning "Could not remove user $USER_NAME"
+        else
+            print_warning "User $USER_NAME has running processes, not removing"
+        fi
+    fi
+
+    print_success "Tailstream Agent uninstalled successfully"
+    exit 0
+}
+
+# Check for uninstall flag
+if [[ "$1" == "--uninstall" ]]; then
+    uninstall
+fi
 
 # Detect architecture
 detect_arch() {
@@ -126,10 +187,22 @@ download_binary() {
         print_success "Checksum verified"
     fi
 
-    # Install binary
-    print_status "Installing binary to $INSTALL_DIR/$BINARY_NAME..."
+    # Create /opt/tailstream directory structure
+    print_status "Creating directory structure..."
+    mkdir -p "$BIN_DIR"
+
+    # Install binary to /opt/tailstream/bin
+    print_status "Installing binary to $BIN_DIR/$BINARY_NAME..."
     chmod +x "$binary_name"
-    mv "$binary_name" "$INSTALL_DIR/$BINARY_NAME"
+    mv "$binary_name" "$BIN_DIR/$BINARY_NAME"
+
+    # Create symlink for PATH access
+    print_status "Creating symlink at $SYMLINK_PATH..."
+    ln -sf "$BIN_DIR/$BINARY_NAME" "$SYMLINK_PATH"
+
+    # Set ownership of /opt/tailstream to tailstream user
+    print_status "Setting ownership of $OPT_DIR to $USER_NAME..."
+    chown -R "$USER_NAME:$USER_NAME" "$OPT_DIR"
 
     # Cleanup
     cd /
@@ -255,7 +328,7 @@ After=network.target
 Type=simple
 User=$USER_NAME
 Group=$USER_NAME
-ExecStart=$INSTALL_DIR/$BINARY_NAME
+ExecStart=$BIN_DIR/$BINARY_NAME
 Restart=always
 RestartSec=5
 StandardOutput=journal

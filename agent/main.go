@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -155,6 +156,48 @@ func main() {
 		return
 	}
 
+	// Handle help command
+	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h" || os.Args[1] == "help") {
+		fmt.Printf("Tailstream Agent %s\n\n", Version)
+		fmt.Printf("USAGE:\n")
+		fmt.Printf("  tailstream-agent [COMMAND]\n\n")
+		fmt.Printf("COMMANDS:\n")
+		fmt.Printf("  (none)       Start the agent (runs setup wizard if needed)\n")
+		fmt.Printf("  version      Show version information\n")
+		fmt.Printf("  update       Check for and install updates manually\n")
+		fmt.Printf("  status       Show agent and update status\n")
+		fmt.Printf("  help         Show this help message\n\n")
+		fmt.Printf("OPTIONS:\n")
+		fmt.Printf("  --config     Path to configuration file\n")
+		fmt.Printf("  --version    Show version information\n")
+		fmt.Printf("  --help       Show this help message\n\n")
+		fmt.Printf("EXAMPLES:\n")
+		fmt.Printf("  tailstream-agent                           # Start with setup wizard\n")
+		fmt.Printf("  tailstream-agent --config /path/config.yaml\n")
+		fmt.Printf("  tailstream-agent update                    # Manual update check\n")
+		fmt.Printf("  tailstream-agent status                    # Check status\n")
+		return
+	}
+
+	// Handle status command
+	if len(os.Args) > 1 && os.Args[1] == "status" {
+		fmt.Printf("Tailstream Agent Status\n")
+		fmt.Printf("Version: %s\n", Version)
+		fmt.Printf("Build Date: %s\n", BuildDate)
+		fmt.Printf("Git Commit: %s\n", GitCommit)
+
+		// Show installation type
+		execPath, _ := os.Executable()
+		if realPath, err := filepath.EvalSymlinks(execPath); err == nil && realPath != execPath {
+			fmt.Printf("Installation: %s (symlinked from %s)\n", realPath, execPath)
+		} else {
+			fmt.Printf("Installation: %s\n", execPath)
+		}
+
+		fmt.Printf("Auto-updates: Enabled\n")
+		return
+	}
+
 	// Check if setup wizard is needed
 	if len(os.Args) == 1 && needsSetup() {
 		if err := setupWizard(); err != nil {
@@ -164,6 +207,15 @@ func main() {
 	}
 
 	cfg := loadConfig()
+
+	// Handle update command (after config loading)
+	for _, arg := range os.Args {
+		if arg == "update" || arg == "--update" {
+			fmt.Printf("Checking for updates (current version: %s)...\n", Version)
+			checkForUpdatesForce(cfg, true)
+			return
+		}
+	}
 
 	// Check for updates in the background
 	go checkForUpdates(cfg)

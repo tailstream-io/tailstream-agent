@@ -21,7 +21,6 @@ import (
 const (
 	GitHubRepo = "tailstream-io/tailstream-agent"
 	UpdateCheckFile = ".tailstream_last_update_check"
-	UpdatePendingFile = ".tailstream_update_pending"
 )
 
 type GitHubRelease struct {
@@ -207,6 +206,18 @@ func getBinaryName() string {
 	return ""
 }
 
+func checkWritePermission(dir string) error {
+	// Try to create a temporary file to test write permissions
+	testFile := filepath.Join(dir, ".tailstream-write-test")
+	f, err := os.Create(testFile)
+	if err != nil {
+		return err
+	}
+	f.Close()
+	os.Remove(testFile)
+	return nil
+}
+
 func downloadFile(url, destination string) error {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -289,8 +300,36 @@ func performSelfUpdate(updateInfo UpdateInfo) error {
 		return fmt.Errorf("failed to resolve executable path: %v", err)
 	}
 
+	// Check if we have write permission to the directory
+	execDir := filepath.Dir(execPath)
+	if err := checkWritePermission(execDir); err != nil {
+		// For typical installations in /usr/local/bin, provide helpful guidance
+		if strings.Contains(execDir, "/usr/local/bin") || strings.Contains(execDir, "/usr/bin") {
+			return fmt.Errorf("cannot update binary in %s (permission denied)\n\n"+
+				"The agent is installed system-wide but running as a non-root user.\n"+
+				"To update, run one of these commands:\n\n"+
+				"  sudo systemctl stop tailstream-agent\n"+
+				"  sudo tailstream-agent update\n"+
+				"  sudo systemctl start tailstream-agent\n\n"+
+				"Or use the installer:\n"+
+				"  curl -fsSL https://install.tailstream.io | sudo bash\n\n"+
+				"Original error: %v", execDir, err)
+		}
+
+		// For /opt/tailstream installations, this should work with proper ownership
+		if strings.Contains(execDir, "/opt/tailstream") {
+			return fmt.Errorf("cannot update binary in %s (permission denied)\n\n"+
+				"This appears to be a /opt/tailstream installation but permissions are incorrect.\n"+
+				"The /opt/tailstream directory should be owned by the tailstream user.\n"+
+				"Try reinstalling with: curl -fsSL https://install.tailstream.io | sudo bash\n\n"+
+				"Original error: %v", execDir, err)
+		}
+
+		return fmt.Errorf("insufficient permissions to update binary in %s: %v", execDir, err)
+	}
+
 	// Download new binary to temp location
-	tempFile := execPath + ".update"
+	tempFile := filepath.Join(execDir, ".tailstream-agent.update.tmp")
 	if err := downloadFile(updateInfo.DownloadURL, tempFile); err != nil {
 		return fmt.Errorf("failed to download update: %v", err)
 	}
@@ -347,10 +386,17 @@ func requestSystemdRestart() error {
 	return cmd.Run()
 }
 
-func checkForUpdates(cfg Config) {
-	if !cfg.Updates.Enabled || !shouldCheckForUpdates(cfg) {
+func checkForUpdatesForce(cfg Config, force bool) {
+	if !cfg.Updates.Enabled && !force {
 		if os.Getenv("DEBUG") == "1" {
-			log.Printf("Skipping update check (enabled=%v, should_check=%v)", cfg.Updates.Enabled, shouldCheckForUpdates(cfg))
+			log.Printf("Updates disabled and not forced")
+		}
+		return
+	}
+
+	if !force && !shouldCheckForUpdates(cfg) {
+		if os.Getenv("DEBUG") == "1" {
+			log.Printf("Skipping update check (should_check=false)")
 		}
 		return
 	}
@@ -415,12 +461,22 @@ func checkForUpdates(cfg Config) {
 		time.Sleep(delay)
 	}
 
-	// Perform the update
+	// Perform the self-update
 	if err := performSelfUpdate(updateInfo); err != nil {
 		log.Printf("Self-update failed: %v", err)
-		fmt.Printf("\n🔄 Update available: %s → %s\n", Version, release.TagName)
-		fmt.Printf("❌ Auto-update failed: %v\n", err)
-		fmt.Printf("📥 Manual download: %s\n", release.HTMLURL)
-		fmt.Printf("⚡ Quick install: curl -fsSL https://install.tailstream.io | bash\n\n")
+
+		// Show user-friendly error message only in interactive mode
+		if os.Getenv("DEBUG") == "1" {
+			fmt.Printf("\n🔄 Update available: %s → %s\n", Version, release.TagName)
+			fmt.Printf("❌ Auto-update failed: %v\n", err)
+			fmt.Printf("📥 Manual download: %s\n", release.HTMLURL)
+			fmt.Printf("⚡ Quick install: curl -fsSL https://install.tailstream.io | bash\n\n")
+		}
+	} else {
+		log.Printf("Successfully updated from %s to %s", updateInfo.CurrentVersion, updateInfo.LatestVersion)
 	}
+}
+
+func checkForUpdates(cfg Config) {
+	checkForUpdatesForce(cfg, false)
 }
