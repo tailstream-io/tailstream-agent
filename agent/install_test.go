@@ -52,7 +52,7 @@ func TestBinaryInstallation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(ctx, bin, "--config", cfgFile, "--debug")
-	cmd.Env = append(os.Environ(), "TAILSTREAM_KEY=dummy")
+	cmd.Env = append(os.Environ(), "TAILSTREAM_KEY=dummy", "TAILSTREAM_DISABLE_UPDATES=1")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out

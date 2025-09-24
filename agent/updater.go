@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	GitHubRepo = "tailstream-io/tailstream-agent"
+	GitHubRepo      = "tailstream-io/tailstream-agent"
 	UpdateCheckFile = ".tailstream_last_update_check"
 )
 
@@ -36,11 +36,11 @@ type GitHubRelease struct {
 }
 
 type UpdateInfo struct {
-	Available     bool
+	Available      bool
 	CurrentVersion string
-	LatestVersion string
-	DownloadURL   string
-	ChecksumURL   string
+	LatestVersion  string
+	DownloadURL    string
+	ChecksumURL    string
 }
 
 func compareVersions(current, latest string) (bool, error) {
@@ -387,6 +387,14 @@ func requestSystemdRestart() error {
 }
 
 func checkForUpdatesForce(cfg Config, force bool) {
+	// Check environment variable to disable updates (useful for testing)
+	if os.Getenv("TAILSTREAM_DISABLE_UPDATES") == "1" || os.Getenv("TAILSTREAM_DISABLE_UPDATES") == "true" {
+		if os.Getenv("DEBUG") == "1" {
+			log.Printf("Updates disabled by environment variable")
+		}
+		return
+	}
+
 	if !cfg.Updates.Enabled && !force {
 		if os.Getenv("DEBUG") == "1" {
 			log.Printf("Updates disabled and not forced")
