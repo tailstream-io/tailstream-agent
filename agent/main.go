@@ -24,29 +24,62 @@ type LogLine struct {
 }
 
 // tailFile streams appended lines from a file.
+// If the file becomes inaccessible, it will retry opening it every 5 seconds.
 func tailFile(ctx context.Context, file string, ch chan<- LogLine) {
-	f, err := os.Open(file)
-	if err != nil {
-		log.Printf("open %s: %v", file, err)
-		return
-	}
-	defer f.Close()
+	var f *os.File
+	var reader *bufio.Reader
+	var err error
 
-	f.Seek(0, io.SeekEnd)
-	reader := bufio.NewReader(f)
+	// Try to open file initially
+	f, err = os.Open(file)
+	if err != nil {
+		log.Printf("ERROR: Cannot open %s: %v - will retry every 5s", file, err)
+	} else {
+		f.Seek(0, io.SeekEnd)
+		reader = bufio.NewReader(f)
+	}
+
+	retryTicker := time.NewTicker(5 * time.Second)
+	defer retryTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
+			if f != nil {
+				f.Close()
+			}
 			return
+
+		case <-retryTicker.C:
+			// Retry opening file if we don't have it open
+			if f == nil {
+				f, err = os.Open(file)
+				if err != nil {
+					log.Printf("ERROR: Still cannot access %s: %v - will keep retrying", file, err)
+					continue
+				}
+				log.Printf("SUCCESS: Reconnected to %s after access issue", file)
+				f.Seek(0, io.SeekEnd)
+				reader = bufio.NewReader(f)
+			}
+
 		default:
+			if f == nil {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+
 			line, err := reader.ReadString('\n')
 			if err != nil {
 				if err == io.EOF {
 					time.Sleep(200 * time.Millisecond)
 					continue
 				}
-				log.Printf("read %s: %v", file, err)
-				return
+				log.Printf("ERROR: Lost access to %s: %v - will attempt to reconnect", file, err)
+				f.Close()
+				f = nil
+				reader = nil
+				continue
 			}
 			ch <- LogLine{File: file, Line: strings.TrimRight(line, "\r\n")}
 		}

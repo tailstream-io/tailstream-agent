@@ -162,7 +162,7 @@ setup_acl_permissions() {
     for dir in "${log_dirs[@]}"; do
         if [[ -d "$dir" ]]; then
             setfacl -m u:$USER_NAME:rX "$dir" 2>/dev/null || continue
-            setfacl -dm u:$USER_NAME:r "$dir" 2>/dev/null || true
+            setfacl -dm u:$USER_NAME:rX "$dir" 2>/dev/null || true
             find "$dir" -name "*.log" -type f -exec setfacl -m u:$USER_NAME:r {} \; 2>/dev/null || true
         fi
     done
