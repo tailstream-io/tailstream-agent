@@ -21,6 +21,13 @@ type Config struct {
 		} `yaml:"paths"`
 	} `yaml:"discovery"`
 
+	Updates struct {
+		Enabled       bool   `yaml:"enabled"`         // Enable automatic updates
+		Channel       string `yaml:"channel"`         // stable, beta, or latest
+		CheckHours    int    `yaml:"check_hours"`     // Hours between update checks
+		MaxDelayHours int    `yaml:"max_delay_hours"` // Maximum random delay before updating
+	} `yaml:"updates"`
+
 	// Legacy single stream config (for backward compatibility)
 	Ship struct {
 		URL      string `yaml:"url"`
@@ -74,6 +81,12 @@ func loadConfig() Config {
 	}
 	cfg.Discovery.Paths.Exclude = []string{"**/*.gz", "**/*.1"}
 
+	// Update defaults
+	cfg.Updates.Enabled = true
+	cfg.Updates.Channel = "stable"
+	cfg.Updates.CheckHours = 24
+	cfg.Updates.MaxDelayHours = 6
+
 	// Parse flags only if not already parsed (to avoid redefinition in tests)
 	if !flag.Parsed() {
 		configFile := flag.String("config", getDefaultConfigPath(), "path to YAML config")
@@ -116,12 +129,11 @@ func getenv(k, def string) string {
 	return v
 }
 
-// getDefaultConfigPath returns the default config file path based on the OS
+// getDefaultConfigPath returns the default config file path
 func getDefaultConfigPath() string {
-	// Try system-wide locations first
+	// Try system-wide location first
 	systemPaths := []string{
-		"/etc/tailstream/agent.yaml",     // Linux system-wide
-		"/usr/local/etc/tailstream/agent.yaml", // macOS system-wide
+		"/etc/tailstream/agent.yaml", // Linux system-wide
 	}
 
 	for _, path := range systemPaths {

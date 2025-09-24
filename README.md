@@ -14,8 +14,8 @@ curl -fsSL https://install.tailstream.io | sudo bash
 
 This will:
 - Download the correct binary for your Linux architecture (x86_64/ARM64)
-- Install to `/usr/local/bin/tailstream-agent`
-- Create a dedicated `tailstream` user
+- Install to `/opt/tailstream/bin/tailstream-agent` with symlink at `/usr/local/bin/tailstream-agent`
+- Create a dedicated `tailstream` user with ownership of `/opt/tailstream`
 - Set up log file permissions (ACL preferred, group fallback)
 - Set up a systemd service that starts on boot (runs as `tailstream` user)
 - Enable the service (ready to start after configuration)
@@ -122,6 +122,101 @@ Grant access to additional logs:
 sudo setfacl -m u:tailstream:r /path/to/custom.log
 ```
 
+## 🔄 Automatic Updates
+
+The agent includes built-in automatic updates that are **enabled by default**. This ensures your agent stays current with the latest features and security patches without manual intervention.
+
+### How It Works
+
+- **Background Checks**: Checks for updates every 24 hours via GitHub API
+- **Frictionless Self-Updates**: Agent can update itself thanks to `/opt/tailstream` ownership by the `tailstream` user
+- **Staggered Deployment**: Random 0-6 hour delay prevents simultaneous fleet updates
+- **Systemd Integration**: Automatically restarts the service after successful updates
+- **Symlink Compatibility**: Updates real binary in `/opt/tailstream/bin`, symlink remains valid
+- **Checksum Verification**: Validates downloaded binaries for security
+
+### Configuration
+
+```yaml
+updates:
+  enabled: true          # Enable auto-updates (default)
+  channel: stable        # Update channel: stable, beta, or latest
+  check_hours: 24        # Check frequency in hours
+  max_delay_hours: 6     # Maximum random delay before updating
+```
+
+**Update Channels:**
+- **`stable`** (default): Only official stable releases (recommended for production)
+- **`beta`**: Includes beta/pre-release versions for early testing
+- **`latest`**: Any release including the very latest (development/testing only)
+
+### Manual Update Check
+
+You can manually check for and install updates at any time:
+
+```bash
+# Manual update check (works even if auto-updates are disabled)
+tailstream-agent update
+
+# With custom config file
+tailstream-agent --config /path/to/config.yaml update
+```
+
+### System-Wide Installation Updates
+
+The agent is designed to update itself automatically! The installer creates a `/opt/tailstream` directory owned by the `tailstream` user, allowing frictionless self-updates.
+
+**Manual updates** (if needed):
+```bash
+# Check current status
+tailstream-agent status
+
+# Force immediate update check
+tailstream-agent update
+```
+
+**Emergency manual update** (if auto-update fails):
+```bash
+curl -fsSL https://install.tailstream.io | sudo bash
+```
+
+**Note**: Auto-updates work seamlessly with the default installation. No administrator intervention required!
+
+### Checking Update Status
+
+```bash
+# Check if updates are available
+tailstream-agent status
+
+# View systemd logs for update notifications
+sudo journalctl -u tailstream-agent | grep -i update
+```
+
+### Disabling Auto-Updates
+
+To disable automatic updates, set `updates.enabled: false` in your configuration file:
+
+```bash
+sudo nano /etc/tailstream/agent.yaml
+```
+
+Even with auto-updates disabled, you can still use the manual update command.
+
+### Uninstalling
+
+To completely remove the Tailstream Agent:
+
+```bash
+curl -fsSL https://install.tailstream.io | sudo bash -s -- --uninstall
+```
+
+This will:
+- Stop and disable the systemd service
+- Remove all binaries and symlinks
+- Remove configuration files
+- Remove the `tailstream` user (if no processes running)
+- Clean up all installation artifacts
+
 ## Configuration
 
 ### Configuration File
@@ -150,6 +245,11 @@ discovery:
     exclude:
       - "**/*.gz"
       - "**/*.1"
+updates:
+  enabled: true          # Auto-updates enabled by default
+  channel: stable        # Update channel: stable, beta, or latest
+  check_hours: 24        # Check for updates daily
+  max_delay_hours: 6     # Stagger updates (0-6 hour delay)
 ship:
   stream_id: "your-stream-id"
 ```
@@ -287,6 +387,13 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 - `**/*.gz` - Compressed log files
 - `**/*.1` - Rotated log files
 
+**Auto-Update Settings:**
+
+- `updates.enabled` (bool): Enable automatic updates (default: true)
+- `updates.channel` (string): Update channel - `stable` (default), `beta`, or `latest`
+- `updates.check_hours` (int): Hours between update checks (default: 24)
+- `updates.max_delay_hours` (int): Maximum random delay before updating (default: 6)
+
 **Shipping Settings:**
 
 - `ship.stream_id` (string): Tailstream stream ID (URL auto-constructed as https://app.tailstream.io/api/ingest/{stream_id})
@@ -303,6 +410,13 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 ```bash
 ./tailstream-agent-linux-amd64          # Normal operation
 ./tailstream-agent-linux-amd64 --debug  # With debug output
+```
+
+#### Manual update check:
+```bash
+./tailstream-agent-linux-amd64 update   # Check for updates manually
+./tailstream-agent-linux-amd64 version  # Show current version
+./tailstream-agent-linux-amd64 help     # Show help
 ```
 
 #### Manual configuration with YAML:
