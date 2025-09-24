@@ -9,7 +9,7 @@ A lightweight Go agent that automatically discovers and parses common web server
 Install and set up the agent as a system service with a single command:
 
 ```bash
-curl https://install.tailstream.io | sudo bash
+curl -fsSL https://install.tailstream.io | sudo bash
 ```
 
 This will:
@@ -17,13 +17,26 @@ This will:
 - Install to `/usr/local/bin/tailstream-agent`
 - Create a dedicated `tailstream` user
 - Set up log file permissions (ACL preferred, group fallback)
-- Set up a systemd service that starts on boot
+- Set up a systemd service that starts on boot (runs as `tailstream` user)
 - Enable the service (ready to start after configuration)
+
+**Note:** Only the installation step requires root (`sudo`). After setup, the agent runs as a non-root user.
 
 After installation, run the setup wizard:
 ```bash
 sudo -u tailstream tailstream-agent
 ```
+
+### Security & Permissions
+
+> [!TIP]
+> Root permissions are only required during installation.
+
+ After installation, the Tailstream Agent runs as the dedicated `tailstream` user (created by the installer) and does NOT require root privileges for normal operation. This approach follows the principle of least privilege for improved security.
+
+- **Install:** Requires root (`sudo`) to set up binaries, permissions, and the system service.
+- **Run:** The agent runs as a non-root user (`tailstream`) with only the permissions needed to access log files.
+
 
 ### Manual Installation
 
@@ -38,6 +51,8 @@ sudo -u tailstream tailstream-agent
    ```
 3. **Enter your Stream ID and Access Token** when prompted
 4. **Done!** The agent will automatically discover and stream your logs
+
+For production use, run the agent as a non-root user. The one-liner installer configures this automatically.
 
 ### Building from Source
 
@@ -92,6 +107,8 @@ sudo nano /etc/tailstream/agent.yaml       # Edit configuration
 # Uninstall
 curl https://install.tailstream.io | sudo bash -s -- --uninstall
 ```
+
+The systemd service is configured to run as the `tailstream` user by default. You do not need root privileges to run or operate the agent after installation.
 
 ### Log File Permissions
 
@@ -265,7 +282,6 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 - `/var/log/caddy/*.log` - Caddy web server logs
 - `/var/log/apache2/*.log` - Apache logs
 - `/var/log/httpd/*.log` - Apache/httpd logs
-- `/var/www/**/storage/logs/*.log` - Laravel/PHP application logs
 
 **Default Exclude Patterns:**
 - `**/*.gz` - Compressed log files
