@@ -198,9 +198,9 @@ func main() {
 		return
 	}
 
-	// Check if setup wizard is needed
+	// Check if setup is needed
 	if len(os.Args) == 1 && needsSetup() {
-		if err := setupWizard(); err != nil {
+		if err := setupOAuth(); err != nil {
 			log.Fatalf("Setup failed: %v", err)
 		}
 		return

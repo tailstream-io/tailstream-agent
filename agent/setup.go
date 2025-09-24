@@ -118,20 +118,20 @@ func createConfigDir(configPath string) error {
 
 // needsSetup checks if initial setup is required
 func needsSetup() bool {
-	// Check if config file exists in system locations
-	systemPaths := []string{
-		"/etc/tailstream/agent.yaml",
-		"/usr/local/etc/tailstream/agent.yaml",
-		"tailstream.yaml", // Local fallback
+	// Load config to check current state
+	cfg := loadConfig()
+
+	// If we have a token and streams, we're set up
+	if cfg.Key != "" && len(cfg.Streams) > 0 {
+		return false
 	}
 
-	for _, path := range systemPaths {
-		if _, err := os.Stat(path); err == nil {
-			return false
-		}
+	// Check legacy single stream setup
+	if cfg.Key != "" && cfg.Ship.StreamID != "" {
+		return false
 	}
 
-	// Check if environment variables are set
+	// Environment variable fallback
 	if os.Getenv("TAILSTREAM_KEY") != "" {
 		return false
 	}

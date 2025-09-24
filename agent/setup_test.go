@@ -8,33 +8,45 @@ import (
 func TestNeedsSetup(t *testing.T) {
 	tests := []struct {
 		name           string
-		configExists   bool
+		configContent  string
 		envKeySet      bool
 		expectedResult bool
 	}{
 		{
-			name:           "config file exists",
-			configExists:   true,
+			name:           "valid config with streams",
+			configContent:  "env: production\nkey: test-token\nstreams:\n  - name: test\n    stream_id: test-123\n    paths: ['/var/log/*.log']",
+			envKeySet:      false,
+			expectedResult: false,
+		},
+		{
+			name:           "valid legacy config",
+			configContent:  "env: production\nkey: test-token\nship:\n  url: https://example.com\n  stream_id: test-123",
 			envKeySet:      false,
 			expectedResult: false,
 		},
 		{
 			name:           "environment key set",
-			configExists:   false,
+			configContent:  "",
 			envKeySet:      true,
 			expectedResult: false,
 		},
 		{
-			name:           "neither config nor env key",
-			configExists:   false,
+			name:           "incomplete config file",
+			configContent:  "test: config",
 			envKeySet:      false,
 			expectedResult: true,
 		},
 		{
-			name:           "both config and env key",
-			configExists:   true,
-			envKeySet:      true,
-			expectedResult: false,
+			name:           "no config and no env key",
+			configContent:  "",
+			envKeySet:      false,
+			expectedResult: true,
+		},
+		{
+			name:           "config with key but no streams",
+			configContent:  "env: production\nkey: test-token",
+			envKeySet:      false,
+			expectedResult: true,
 		},
 	}
 
@@ -47,8 +59,8 @@ func TestNeedsSetup(t *testing.T) {
 			defer os.Chdir(originalDir)
 
 			// Create config file if needed
-			if tt.configExists {
-				os.WriteFile("tailstream.yaml", []byte("test: config"), 0600)
+			if tt.configContent != "" {
+				os.WriteFile("tailstream.yaml", []byte(tt.configContent), 0600)
 			}
 
 			// Set environment variable if needed
