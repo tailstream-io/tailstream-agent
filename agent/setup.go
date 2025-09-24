@@ -104,10 +104,8 @@ func getSystemConfigPath() string {
 	switch runtime.GOOS {
 	case "linux":
 		return "/etc/tailstream/agent.yaml"
-	case "darwin":
-		return "/usr/local/etc/tailstream/agent.yaml"
 	default:
-		// Windows or other - use current directory
+		// Other platforms - use current directory
 		return "tailstream.yaml"
 	}
 }

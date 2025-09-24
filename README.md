@@ -122,6 +122,41 @@ Grant access to additional logs:
 sudo setfacl -m u:tailstream:r /path/to/custom.log
 ```
 
+## 🔄 Automatic Updates
+
+The agent includes built-in automatic updates that are **enabled by default**. This ensures your agent stays current with the latest features and security patches without manual intervention.
+
+### How It Works
+
+- **Background Checks**: Checks for updates every 24 hours via GitHub API
+- **Self-Updating**: Downloads and installs updates automatically on Linux
+- **Staggered Deployment**: Random 0-6 hour delay prevents simultaneous fleet updates
+- **Systemd Integration**: Automatically restarts the service after updates
+- **Checksum Verification**: Validates downloaded binaries for security
+
+### Configuration
+
+```yaml
+updates:
+  enabled: true          # Enable auto-updates (default)
+  channel: stable        # Update channel: stable, beta, or latest
+  check_hours: 24        # Check frequency in hours
+  max_delay_hours: 6     # Maximum random delay before updating
+```
+
+**Update Channels:**
+- **`stable`** (default): Only official stable releases (recommended for production)
+- **`beta`**: Includes beta/pre-release versions for early testing
+- **`latest`**: Any release including the very latest (development/testing only)
+
+### Disabling Auto-Updates
+
+To disable automatic updates, set `updates.enabled: false` in your configuration file:
+
+```bash
+sudo nano /etc/tailstream/agent.yaml
+```
+
 ## Configuration
 
 ### Configuration File
@@ -150,6 +185,11 @@ discovery:
     exclude:
       - "**/*.gz"
       - "**/*.1"
+updates:
+  enabled: true          # Auto-updates enabled by default
+  channel: stable        # Update channel: stable, beta, or latest
+  check_hours: 24        # Check for updates daily
+  max_delay_hours: 6     # Stagger updates (0-6 hour delay)
 ship:
   stream_id: "your-stream-id"
 ```
@@ -286,6 +326,13 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 **Default Exclude Patterns:**
 - `**/*.gz` - Compressed log files
 - `**/*.1` - Rotated log files
+
+**Auto-Update Settings:**
+
+- `updates.enabled` (bool): Enable automatic updates (default: true)
+- `updates.channel` (string): Update channel - `stable` (default), `beta`, or `latest`
+- `updates.check_hours` (int): Hours between update checks (default: 24)
+- `updates.max_delay_hours` (int): Maximum random delay before updating (default: 6)
 
 **Shipping Settings:**
 

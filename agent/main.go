@@ -15,6 +15,12 @@ import (
 	"time"
 )
 
+var (
+	Version   = "dev"
+	BuildDate = "unknown"
+	GitCommit = "unknown"
+)
+
 
 
 // LogLine represents a line read from a file.
@@ -141,6 +147,14 @@ func shipEvents(ctx context.Context, stream StreamConfig, globalKey string, even
 }
 
 func main() {
+	// Handle version command
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v" || os.Args[1] == "version") {
+		fmt.Printf("tailstream-agent %s\n", Version)
+		fmt.Printf("Build date: %s\n", BuildDate)
+		fmt.Printf("Git commit: %s\n", GitCommit)
+		return
+	}
+
 	// Check if setup wizard is needed
 	if len(os.Args) == 1 && needsSetup() {
 		if err := setupWizard(); err != nil {
@@ -150,6 +164,9 @@ func main() {
 	}
 
 	cfg := loadConfig()
+
+	// Check for updates in the background
+	go checkForUpdates(cfg)
 	host, _ := os.Hostname()
 
 	// Validate required configuration
