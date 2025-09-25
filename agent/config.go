@@ -84,7 +84,7 @@ func loadConfig() Config {
 	// Update defaults
 	cfg.Updates.Enabled = true
 	cfg.Updates.Channel = "stable"
-	cfg.Updates.CheckHours = 24
+	cfg.Updates.CheckHours = 1
 	cfg.Updates.MaxDelayHours = 6
 
 	// Parse flags only if not already parsed (to avoid redefinition in tests)
