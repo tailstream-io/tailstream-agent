@@ -128,7 +128,7 @@ The agent includes built-in automatic updates that are **enabled by default**. T
 
 ### How It Works
 
-- **Background Checks**: Checks for updates every 24 hours via GitHub API
+- **Background Checks**: Checks for updates every hour via GitHub API
 - **Frictionless Self-Updates**: Agent can update itself thanks to `/opt/tailstream` ownership by the `tailstream` user
 - **Staggered Deployment**: Random 0-6 hour delay prevents simultaneous fleet updates
 - **Systemd Integration**: Automatically restarts the service after successful updates
@@ -141,7 +141,7 @@ The agent includes built-in automatic updates that are **enabled by default**. T
 updates:
   enabled: true          # Enable auto-updates (default)
   channel: stable        # Update channel: stable, beta, or latest
-  check_hours: 24        # Check frequency in hours
+  check_hours: 1         # Check frequency in hours
   max_delay_hours: 6     # Maximum random delay before updating
 ```
 
@@ -248,7 +248,7 @@ discovery:
 updates:
   enabled: true          # Auto-updates enabled by default
   channel: stable        # Update channel: stable, beta, or latest
-  check_hours: 24        # Check for updates daily
+  check_hours: 1         # Check for updates hourly
   max_delay_hours: 6     # Stagger updates (0-6 hour delay)
 ship:
   stream_id: "your-stream-id"
@@ -391,7 +391,7 @@ If you prefer not to use the setup wizard, you can configure the agent manually:
 
 - `updates.enabled` (bool): Enable automatic updates (default: true)
 - `updates.channel` (string): Update channel - `stable` (default), `beta`, or `latest`
-- `updates.check_hours` (int): Hours between update checks (default: 24)
+- `updates.check_hours` (int): Hours between update checks (default: 1)
 - `updates.max_delay_hours` (int): Maximum random delay before updating (default: 6)
 
 **Shipping Settings:**

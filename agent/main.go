@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -32,9 +33,11 @@ type LogLine struct {
 
 // tailFile streams appended lines from a file.
 // If the file becomes inaccessible, it will retry opening it every 5 seconds.
+// It also detects log rotation by tracking file inodes.
 func tailFile(ctx context.Context, file string, ch chan<- LogLine) {
 	var f *os.File
 	var reader *bufio.Reader
+	var currentInode uint64
 	var err error
 
 	// Try to open file initially
@@ -44,6 +47,13 @@ func tailFile(ctx context.Context, file string, ch chan<- LogLine) {
 	} else {
 		f.Seek(0, io.SeekEnd)
 		reader = bufio.NewReader(f)
+		if stat, err := f.Stat(); err == nil {
+			if sys := stat.Sys(); sys != nil {
+				if stat_t, ok := sys.(*syscall.Stat_t); ok {
+					currentInode = stat_t.Ino
+				}
+			}
+		}
 	}
 
 	retryTicker := time.NewTicker(5 * time.Second)
@@ -58,6 +68,30 @@ func tailFile(ctx context.Context, file string, ch chan<- LogLine) {
 			return
 
 		case <-retryTicker.C:
+			// Check if file has been rotated (inode changed)
+			if f != nil {
+				if stat, err := os.Stat(file); err == nil {
+					if sys := stat.Sys(); sys != nil {
+						if stat_t, ok := sys.(*syscall.Stat_t); ok {
+							if stat_t.Ino != currentInode {
+								log.Printf("ROTATION: File %s rotated (inode changed %d -> %d), reconnecting", file, currentInode, stat_t.Ino)
+								f.Close()
+								f = nil
+								reader = nil
+								currentInode = 0
+							}
+						}
+					}
+				} else {
+					// File disappeared, close and retry
+					log.Printf("ROTATION: File %s disappeared, will reconnect", file)
+					f.Close()
+					f = nil
+					reader = nil
+					currentInode = 0
+				}
+			}
+
 			// Retry opening file if we don't have it open
 			if f == nil {
 				f, err = os.Open(file)
@@ -65,9 +99,16 @@ func tailFile(ctx context.Context, file string, ch chan<- LogLine) {
 					log.Printf("ERROR: Still cannot access %s: %v - will keep retrying", file, err)
 					continue
 				}
-				log.Printf("SUCCESS: Reconnected to %s after access issue", file)
+				log.Printf("SUCCESS: Reconnected to %s after access issue/rotation", file)
 				f.Seek(0, io.SeekEnd)
 				reader = bufio.NewReader(f)
+				if stat, err := f.Stat(); err == nil {
+					if sys := stat.Sys(); sys != nil {
+						if stat_t, ok := sys.(*syscall.Stat_t); ok {
+							currentInode = stat_t.Ino
+						}
+					}
+				}
 			}
 
 		default:
@@ -86,6 +127,7 @@ func tailFile(ctx context.Context, file string, ch chan<- LogLine) {
 				f.Close()
 				f = nil
 				reader = nil
+				currentInode = 0
 				continue
 			}
 			ch <- LogLine{File: file, Line: strings.TrimRight(line, "\r\n")}
