@@ -39,7 +39,6 @@ func TestLoadConfigDefaults(t *testing.T) {
 		"/var/log/caddy/*.log",
 		"/var/log/apache2/*.log",
 		"/var/log/httpd/*.log",
-		"/var/www/**/storage/logs/*.log",
 	}
 
 	if len(cfg.Discovery.Paths.Include) != len(expectedPaths) {
@@ -57,7 +56,6 @@ func TestLoadConfigFromYAML(t *testing.T) {
 	// Test YAML loading by directly testing the YAML unmarshaling
 	yamlContent := `
 env: staging
-key: test-key-from-yaml
 discovery:
   enabled: true
   paths:
@@ -65,12 +63,10 @@ discovery:
       - "/custom/path/*.log"
     exclude:
       - "**/*.old"
-ship:
-  url: "https://test.example.com/ingest"
-  stream_id: "test-stream-id"
 streams:
   - name: "test-stream"
     stream_id: "stream-123"
+    key: "test-key-from-yaml"
     paths:
       - "/test/*.log"
 `
@@ -85,14 +81,6 @@ streams:
 		t.Errorf("Expected env to be 'staging', got: %s", cfg.Env)
 	}
 
-	if cfg.Key != "test-key-from-yaml" {
-		t.Errorf("Expected key to be 'test-key-from-yaml', got: %s", cfg.Key)
-	}
-
-	if cfg.Ship.URL != "https://test.example.com/ingest" {
-		t.Errorf("Expected ship URL to be loaded from YAML, got: %s", cfg.Ship.URL)
-	}
-
 	if len(cfg.Streams) != 1 {
 		t.Errorf("Expected 1 stream from YAML, got: %d", len(cfg.Streams))
 	}
@@ -105,15 +93,16 @@ streams:
 		if stream.StreamID != "stream-123" {
 			t.Errorf("Expected stream ID 'stream-123', got: %s", stream.StreamID)
 		}
+		if stream.Key != "test-key-from-yaml" {
+			t.Errorf("Expected stream key to be 'test-key-from-yaml', got: %s", stream.Key)
+		}
 	}
 }
 
 func TestLoadConfigEnvironmentOverrides(t *testing.T) {
 	// Set environment variables
-	os.Setenv("TAILSTREAM_KEY", "env-key")
 	os.Setenv("TAILSTREAM_ENV", "development")
 	defer func() {
-		os.Unsetenv("TAILSTREAM_KEY")
 		os.Unsetenv("TAILSTREAM_ENV")
 	}()
 
@@ -123,12 +112,10 @@ func TestLoadConfigEnvironmentOverrides(t *testing.T) {
 
 	cfg := loadConfig()
 
-	if cfg.Key != "env-key" {
-		t.Errorf("Expected key from environment, got: %s", cfg.Key)
+	// Note: TAILSTREAM_ENV should override the default and we set it to development
+	if cfg.Env != "development" {
+		t.Errorf("Expected env to be 'development' from environment variable, got: %s", cfg.Env)
 	}
-
-	// Note: TAILSTREAM_ENV should override the default but we load it into cfg.Env
-	// The actual override happens through getenv() which we test separately
 }
 
 func TestStreamConfigGetURL(t *testing.T) {

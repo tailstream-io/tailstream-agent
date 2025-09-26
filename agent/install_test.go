@@ -44,7 +44,7 @@ func TestBinaryInstallation(t *testing.T) {
 		t.Fatalf("create log: %v", err)
 	}
 
-	cfg := []byte("ship:\n  url: '" + srv.URL + "'\n  stream_id: 'test'\nkey: 'dummy'\ndiscovery:\n  paths:\n    include:\n      - '" + filepath.Join(logDir, "*.log") + "'\nupdates:\n  enabled: false\n")
+	cfg := []byte("streams:\n  - name: 'test-stream'\n    stream_id: 'test'\n    url: '" + srv.URL + "'\n    key: 'dummy'\n    paths:\n      - '" + filepath.Join(logDir, "*.log") + "'\nupdates:\n  enabled: false\n")
 	cfgFile := filepath.Join(tmp, "agent.yaml")
 	if err := os.WriteFile(cfgFile, cfg, 0o644); err != nil {
 		t.Fatalf("write config: %v", err)

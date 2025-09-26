@@ -42,7 +42,6 @@ func setupWizard() error {
 	// Create config
 	cfg := Config{
 		Env: "production",
-		Key: accessToken,
 		Discovery: struct {
 			Enabled bool `yaml:"enabled"`
 			Paths   struct {
@@ -60,18 +59,22 @@ func setupWizard() error {
 					"/var/log/caddy/*.log",
 					"/var/log/apache2/*.log",
 					"/var/log/httpd/*.log",
-					"/var/www/**/storage/logs/*.log",
 				},
 				Exclude: []string{"**/*.gz", "**/*.1"},
 			},
 		},
-		Ship: struct {
-			URL      string `yaml:"url"`
-			StreamID string `yaml:"stream_id"`
-		}{
-			URL:      fmt.Sprintf("https://app.tailstream.io/api/ingest/%s", streamID),
+		Streams: []StreamConfig{{
+			Name:     "Default Stream",
 			StreamID: streamID,
-		},
+			Key:      accessToken,
+			Paths: []string{
+				"/var/log/nginx/*.log",
+				"/var/log/caddy/*.log",
+				"/var/log/apache2/*.log",
+				"/var/log/httpd/*.log",
+			},
+			Exclude: []string{"**/*.gz", "**/*.1"},
+		}},
 	}
 
 	// Save config to file
