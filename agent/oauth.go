@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -55,7 +56,9 @@ type Stream struct {
 	Name        string `json:"name"`
 	StreamID    string `json:"stream_id"`
 	Description string `json:"description"`
-	IngestToken string `json:"ingest_token"`
+	Ingest      struct {
+		Token string `json:"token"`
+	} `json:"ingest"`
 }
 
 // UserPlan represents the user's plan information
@@ -344,7 +347,7 @@ func selectStream(existingStreams []Stream, plan UserPlan, accessToken string) (
 	streamConfig := &StreamConfig{
 		Name:     streamDetails.Name,
 		StreamID: streamDetails.StreamID,
-		Key:      streamDetails.IngestToken, // Use ingest token instead of OAuth token
+		Key:      streamDetails.Ingest.Token, // Use ingest token instead of OAuth token
 		Paths:    []string{logPath},
 		Exclude:  getDefaultExclusions(),
 	}
@@ -392,7 +395,7 @@ func createStreamWithName(name, accessToken string) (*StreamConfig, error) {
 	return &StreamConfig{
 		Name:     streamDetails.Name,
 		StreamID: streamDetails.StreamID,
-		Key:      streamDetails.IngestToken, // Use ingest token instead of OAuth token
+		Key:      streamDetails.Ingest.Token, // Use ingest token instead of OAuth token
 		Paths:    getDefaultLogPaths(),
 		Exclude:  getDefaultExclusions(),
 	}, nil
@@ -402,9 +405,10 @@ func createStreamWithName(name, accessToken string) (*StreamConfig, error) {
 func getLogPathFromUser() (string, error) {
 	// Try to find existing log files
 	detectedPaths := findExistingLogFiles()
+	suggestedPath := getSuggestedLogPath(detectedPaths)
 
-	if len(detectedPaths) > 0 {
-		fmt.Printf("Select log path: %s\n", detectedPaths[0])
+	if suggestedPath != "" {
+		fmt.Printf("Select log path: %s\n", suggestedPath)
 		fmt.Print("Press Enter to use this path, or type a different one: ")
 	} else {
 		fmt.Print("Select log path: /var/log/nginx/access.log\n")
@@ -416,13 +420,59 @@ func getLogPathFromUser() (string, error) {
 	input := strings.TrimSpace(scanner.Text())
 
 	if input == "" {
-		if len(detectedPaths) > 0 {
-			return detectedPaths[0], nil
+		if suggestedPath != "" {
+			return suggestedPath, nil
 		}
 		return "/var/log/nginx/access.log", nil
 	}
 
 	return input, nil
+}
+
+// getSuggestedLogPath analyzes detected paths and suggests wildcards when appropriate
+func getSuggestedLogPath(detectedPaths []string) string {
+	if len(detectedPaths) == 0 {
+		return ""
+	}
+
+	if len(detectedPaths) == 1 {
+		return detectedPaths[0]
+	}
+
+	// Group paths by directory to detect wildcard opportunities
+	dirGroups := make(map[string][]string)
+	for _, path := range detectedPaths {
+		dir := filepath.Dir(path)
+		dirGroups[dir] = append(dirGroups[dir], path)
+	}
+
+	// If multiple files in the same directory, suggest wildcard
+	for dir, paths := range dirGroups {
+		if len(paths) >= 2 {
+			// Check if they're similar log files (same extension, similar names)
+			if allSimilarLogFiles(paths) {
+				return filepath.Join(dir, "*.log")
+			}
+		}
+	}
+
+	// Fallback to first detected path
+	return detectedPaths[0]
+}
+
+// allSimilarLogFiles checks if all paths are log files in the same directory
+func allSimilarLogFiles(paths []string) bool {
+	if len(paths) < 2 {
+		return false
+	}
+
+	for _, path := range paths {
+		ext := filepath.Ext(path)
+		if ext != ".log" {
+			return false
+		}
+	}
+	return true
 }
 
 // findExistingLogFiles attempts to find existing log files on the system
@@ -448,27 +498,13 @@ func findExistingLogFiles() []string {
 	return foundPaths
 }
 
-// createOAuthConfig creates a configuration with stream-specific tokens (no OAuth token stored)
+// createOAuthConfig creates a clean configuration with only stream-specific tokens
 func createOAuthConfig(streams []StreamConfig) Config {
 	return Config{
 		Env: "production",
 		// No global Key field - each stream has its own ingest token
-		Discovery: struct {
-			Enabled bool `yaml:"enabled"`
-			Paths   struct {
-				Include []string `yaml:"include"`
-				Exclude []string `yaml:"exclude"`
-			} `yaml:"paths"`
-		}{
-			Enabled: true,
-			Paths: struct {
-				Include []string `yaml:"include"`
-				Exclude []string `yaml:"exclude"`
-			}{
-				Include: getDefaultLogPaths(),
-				Exclude: getDefaultExclusions(),
-			},
-		},
+		// No Discovery section - not needed when streams have specific paths
+		// No Ship section - legacy single-stream config not needed
 		Updates: struct {
 			Enabled       bool   `yaml:"enabled"`
 			Channel       string `yaml:"channel"`
@@ -491,7 +527,6 @@ func getDefaultLogPaths() []string {
 		"/var/log/caddy/*.log",
 		"/var/log/apache2/*.log",
 		"/var/log/httpd/*.log",
-		"/var/www/**/storage/logs/*.log",
 	}
 }
 
@@ -527,12 +562,15 @@ func showSetupSummary() {
 	configPath := getSystemConfigPath()
 	fmt.Println("📋 Agent Configuration Summary:")
 	fmt.Printf("• Config file: %s\n", configPath)
-	fmt.Println("• Log discovery: Enabled (searches common log locations)")
+	fmt.Println("• Stream configured with ingest token")
 	fmt.Println("• Auto-updates: Enabled (checks daily)")
 	fmt.Println()
-	fmt.Println("💡 Tips:")
-	fmt.Printf("• Edit %s to customize log paths and settings\n", configPath)
-	fmt.Println("• Restart the agent: sudo systemctl restart tailstream-agent")
+	fmt.Println("🚀 Next Steps:")
+	fmt.Println("• Start the service: sudo systemctl start tailstream-agent")
+	fmt.Println("• Check status: sudo systemctl status tailstream-agent")
 	fmt.Println("• View logs: journalctl -fu tailstream-agent")
+	fmt.Println()
+	fmt.Println("💡 Configuration:")
+	fmt.Printf("• Edit %s to customize settings\n", configPath)
 	fmt.Println("• Debug mode: tailstream-agent --debug")
 }

@@ -287,8 +287,8 @@ func main() {
 	host, _ := os.Hostname()
 
 	// Validate required configuration
-	if cfg.Key == "" && len(cfg.Streams) == 0 {
-		log.Fatal("No access token configured. Use environment variable TAILSTREAM_KEY, run setup wizard, or create tailstream.yaml")
+	if len(cfg.Streams) == 0 {
+		log.Fatal("No streams configured. Run setup wizard or create tailstream.yaml")
 	}
 
 	// For legacy single-stream config
@@ -297,15 +297,11 @@ func main() {
 	}
 
 	if os.Getenv("DEBUG") == "1" {
-		keyDisplay := cfg.Key
-		if len(keyDisplay) > 10 {
-			keyDisplay = keyDisplay[:10] + "..."
-		}
 		if len(cfg.Streams) > 0 {
 			log.Printf("Starting tailstream agent with %d streams (env=%s)", len(cfg.Streams), cfg.Env)
 		} else {
-			log.Printf("Starting tailstream agent (env=%s, key=%s, url=%s)",
-				cfg.Env, keyDisplay, cfg.Ship.URL)
+			log.Printf("Starting tailstream agent (env=%s, url=%s)",
+				cfg.Env, cfg.Ship.URL)
 		}
 	}
 
@@ -369,7 +365,7 @@ func main() {
 					if os.Getenv("DEBUG") == "1" {
 						log.Printf("Timer tick, shipping %d events for stream '%s'", len(sd.batch), streamName)
 					}
-					if err := shipEvents(ctx, sd.stream, cfg.Key, sd.batch); err != nil {
+					if err := shipEvents(ctx, sd.stream, "", sd.batch); err != nil {
 						log.Printf("ship to stream '%s': %v", streamName, err)
 					} else if os.Getenv("DEBUG") == "1" {
 						log.Printf("Successfully shipped %d events to stream '%s'", len(sd.batch), streamName)
@@ -398,7 +394,7 @@ func main() {
 							if os.Getenv("DEBUG") == "1" {
 								log.Printf("Batch full, shipping %d events for stream '%s'", len(sd.batch), streamName)
 							}
-							if err := shipEvents(ctx, sd.stream, cfg.Key, sd.batch); err != nil {
+							if err := shipEvents(ctx, sd.stream, "", sd.batch); err != nil {
 								log.Printf("ship to stream '%s': %v", streamName, err)
 							} else if os.Getenv("DEBUG") == "1" {
 								log.Printf("Successfully shipped batch of %d events to stream '%s'", len(sd.batch), streamName)

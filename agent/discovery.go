@@ -60,7 +60,7 @@ func discover(cfg Config) ([]StreamFileMapping, error) {
 		legacyStream := StreamConfig{
 			Name:     "default",
 			StreamID: cfg.Ship.StreamID,
-			Key:      cfg.Key,
+			Key:      "", // Legacy config - key should be provided via TAILSTREAM_KEY env var
 			Paths:    cfg.Discovery.Paths.Include,
 			Exclude:  cfg.Discovery.Paths.Exclude,
 		}

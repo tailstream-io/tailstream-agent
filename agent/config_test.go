@@ -39,7 +39,6 @@ func TestLoadConfigDefaults(t *testing.T) {
 		"/var/log/caddy/*.log",
 		"/var/log/apache2/*.log",
 		"/var/log/httpd/*.log",
-		"/var/www/**/storage/logs/*.log",
 	}
 
 	if len(cfg.Discovery.Paths.Include) != len(expectedPaths) {

@@ -58,7 +58,6 @@ func TestGetDefaultLogPaths(t *testing.T) {
 		"/var/log/caddy/*.log",
 		"/var/log/apache2/*.log",
 		"/var/log/httpd/*.log",
-		"/var/www/**/storage/logs/*.log",
 	}
 
 	if len(paths) != len(expected) {

@@ -11,7 +11,6 @@ import (
 // Config holds agent configuration values.
 type Config struct {
 	Env string `yaml:"env"`
-	Key string `yaml:"key"` // Default key, can be overridden per stream
 
 	Discovery struct {
 		Enabled bool `yaml:"enabled"`
@@ -19,7 +18,7 @@ type Config struct {
 			Include []string `yaml:"include"`
 			Exclude []string `yaml:"exclude"`
 		} `yaml:"paths"`
-	} `yaml:"discovery"`
+	} `yaml:"discovery,omitempty"`
 
 	Updates struct {
 		Enabled       bool   `yaml:"enabled"`         // Enable automatic updates
@@ -32,7 +31,7 @@ type Config struct {
 	Ship struct {
 		URL      string `yaml:"url"`
 		StreamID string `yaml:"stream_id"`
-	} `yaml:"ship"`
+	} `yaml:"ship,omitempty"`
 
 	// New multi-stream configuration
 	Streams []StreamConfig `yaml:"streams,omitempty"`
@@ -77,7 +76,6 @@ func loadConfig() Config {
 		"/var/log/caddy/*.log",
 		"/var/log/apache2/*.log",
 		"/var/log/httpd/*.log",
-		"/var/www/**/storage/logs/*.log",
 	}
 	cfg.Discovery.Paths.Exclude = []string{"**/*.gz", "**/*.1"}
 
@@ -115,7 +113,12 @@ func loadConfig() Config {
 
 	// Environment variable overrides (always apply)
 	if envKey := os.Getenv("TAILSTREAM_KEY"); envKey != "" {
-		cfg.Key = envKey
+		// Legacy support: if TAILSTREAM_KEY is set and no streams have keys, apply to all streams
+		for i := range cfg.Streams {
+			if cfg.Streams[i].Key == "" {
+				cfg.Streams[i].Key = envKey
+			}
+		}
 	}
 
 	return cfg

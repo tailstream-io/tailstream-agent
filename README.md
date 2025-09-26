@@ -241,7 +241,6 @@ discovery:
       - "/var/log/caddy/*.log"
       - "/var/log/apache2/*.log"
       - "/var/log/httpd/*.log"
-      - "/var/www/**/storage/logs/*.log"
     exclude:
       - "**/*.gz"
       - "**/*.1"
@@ -279,7 +278,6 @@ streams:
     stream_id: "stream-id-2"
     key: "different-access-token"  # This stream uses its own token
     paths:
-      - "/var/www/*/storage/logs/*.log"
       - "/opt/app/logs/*.log"
     exclude:
       - "**/*.old"
