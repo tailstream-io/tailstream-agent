@@ -204,7 +204,9 @@ func main() {
 		fmt.Printf("USAGE:\n")
 		fmt.Printf("  tailstream-agent [COMMAND]\n\n")
 		fmt.Printf("COMMANDS:\n")
-		fmt.Printf("  (none)       Start the agent (runs setup wizard if needed)\n")
+		fmt.Printf("  (none)       Start the agent (runs OAuth setup if needed)\n")
+		fmt.Printf("  oauth        Run OAuth setup wizard\n")
+		fmt.Printf("  setup        Run basic setup wizard (legacy)\n")
 		fmt.Printf("  version      Show version information\n")
 		fmt.Printf("  update       Check for and install updates manually\n")
 		fmt.Printf("  status       Show agent and update status\n")
@@ -213,11 +215,32 @@ func main() {
 		fmt.Printf("  --config     Path to configuration file\n")
 		fmt.Printf("  --version    Show version information\n")
 		fmt.Printf("  --help       Show this help message\n\n")
+		fmt.Printf("ENVIRONMENT VARIABLES:\n")
+		fmt.Printf("  TAILSTREAM_BASE_URL    Override default API base URL\n")
+		fmt.Printf("  TAILSTREAM_KEY         Access token for authentication\n\n")
 		fmt.Printf("EXAMPLES:\n")
-		fmt.Printf("  tailstream-agent                           # Start with setup wizard\n")
+		fmt.Printf("  tailstream-agent                           # Start with OAuth setup\n")
+		fmt.Printf("  tailstream-agent setup                     # Run legacy setup wizard\n")
+		fmt.Printf("  TAILSTREAM_BASE_URL=https://dev.example.com tailstream-agent\n")
 		fmt.Printf("  tailstream-agent --config /path/config.yaml\n")
 		fmt.Printf("  tailstream-agent update                    # Manual update check\n")
 		fmt.Printf("  tailstream-agent status                    # Check status\n")
+		return
+	}
+
+	// Handle OAuth setup command
+	if len(os.Args) > 1 && os.Args[1] == "oauth" {
+		if err := setupOAuth(); err != nil {
+			log.Fatalf("OAuth setup failed: %v", err)
+		}
+		return
+	}
+
+	// Handle legacy basic setup command
+	if len(os.Args) > 1 && os.Args[1] == "setup" {
+		if err := setupWizard(); err != nil {
+			log.Fatalf("Setup failed: %v", err)
+		}
 		return
 	}
 
@@ -240,10 +263,10 @@ func main() {
 		return
 	}
 
-	// Check if setup wizard is needed
+	// Check if OAuth setup is needed
 	if len(os.Args) == 1 && needsSetup() {
-		if err := setupWizard(); err != nil {
-			log.Fatalf("Setup failed: %v", err)
+		if err := setupOAuth(); err != nil {
+			log.Fatalf("OAuth setup failed: %v", err)
 		}
 		return
 	}
