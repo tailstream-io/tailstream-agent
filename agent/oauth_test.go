@@ -171,10 +171,7 @@ func TestCreateOAuthConfig(t *testing.T) {
 		t.Errorf("Expected env to be 'production', got %s", config.Env)
 	}
 
-	// No global key should be set - each stream has its own ingest token
-	if config.Key != "" {
-		t.Errorf("Expected no global key, but got %s", config.Key)
-	}
+	// No global key field exists anymore - each stream has its own ingest token
 
 	if !config.Discovery.Enabled {
 		t.Error("Expected discovery to be enabled")

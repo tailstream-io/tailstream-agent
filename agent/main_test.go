@@ -15,7 +15,6 @@ func TestDiscover(t *testing.T) {
 	cfg.Discovery.Paths.Include = []string{filepath.Join(tmp, "*.log"), filepath.Join(tmp, "*.gz")}
 	cfg.Discovery.Paths.Exclude = []string{"**/*.gz"}
 	cfg.Ship.URL = "https://test.example.com"
-	cfg.Key = "test-key"
 
 	mappings, err := discover(cfg)
 	if err != nil {

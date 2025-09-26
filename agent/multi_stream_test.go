@@ -7,7 +7,6 @@ import (
 func TestMultiStreamDiscovery(t *testing.T) {
 	cfg := Config{
 		Env: "test",
-		Key: "global-key",
 		Streams: []StreamConfig{
 			{
 				Name:     "nginx",
@@ -42,8 +41,9 @@ func TestMultiStreamDiscovery(t *testing.T) {
 			if mapping.Stream.GetURL() != "https://app.tailstream.io/api/ingest/stream-1" {
 				t.Errorf("Expected nginx stream URL to be correct, got: %s", mapping.Stream.GetURL())
 			}
+			// nginx stream has no specific key, so should be empty
 			if mapping.Stream.Key != "" {
-				t.Errorf("Expected nginx stream to use global key, got: %s", mapping.Stream.Key)
+				t.Errorf("Expected nginx stream to have no specific key, got: %s", mapping.Stream.Key)
 			}
 		case "app":
 			if mapping.Stream.Key != "stream-specific-key" {
@@ -57,7 +57,6 @@ func TestLegacyConfigCompatibility(t *testing.T) {
 	// Test that legacy single-stream config still works
 	cfg := Config{
 		Env: "test",
-		Key: "legacy-key",
 		Discovery: struct {
 			Enabled bool `yaml:"enabled"`
 			Paths   struct {
@@ -101,8 +100,9 @@ func TestLegacyConfigCompatibility(t *testing.T) {
 		if mapping.Stream.GetURL() != "https://app.tailstream.io/api/ingest/legacy-stream" {
 			t.Errorf("Expected legacy URL to be preserved, got: %s", mapping.Stream.GetURL())
 		}
-		if mapping.Stream.Key != "legacy-key" {
-			t.Errorf("Expected legacy key to be preserved")
+		// Legacy config doesn't have a global key anymore, streams have their own keys
+		if mapping.Stream.Key != "" {
+			t.Errorf("Expected legacy stream to have no key, got: %s", mapping.Stream.Key)
 		}
 	}
 }

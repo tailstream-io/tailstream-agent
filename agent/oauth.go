@@ -141,7 +141,8 @@ func requestDeviceCode() (*DeviceCodeResponse, error) {
 		"scope":     {"stream:read stream:write stream:create"},
 	}
 
-	resp, err := http.PostForm(getBaseURL()+"/api/oauth/device/code", data)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.PostForm(getBaseURL()+"/api/oauth/device/code", data)
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +170,10 @@ func pollForToken(deviceCode string, interval int) (*TokenResponse, error) {
 
 	timeout := time.Now().Add(10 * time.Minute)
 
+	client := &http.Client{Timeout: 10 * time.Second}
+
 	for time.Now().Before(timeout) {
-		resp, err := http.PostForm(getBaseURL()+"/api/oauth/device/token", data)
+		resp, err := client.PostForm(getBaseURL()+"/api/oauth/device/token", data)
 		if err != nil {
 			time.Sleep(time.Duration(interval) * time.Second)
 			continue
@@ -503,7 +506,15 @@ func createOAuthConfig(streams []StreamConfig) Config {
 	return Config{
 		Env: "production",
 		// No global Key field - each stream has its own ingest token
-		// No Discovery section - not needed when streams have specific paths
+		Discovery: struct {
+			Enabled bool `yaml:"enabled"`
+			Paths   struct {
+				Include []string `yaml:"include"`
+				Exclude []string `yaml:"exclude"`
+			} `yaml:"paths"`
+		}{
+			Enabled: true,
+		},
 		// No Ship section - legacy single-stream config not needed
 		Updates: struct {
 			Enabled       bool   `yaml:"enabled"`
