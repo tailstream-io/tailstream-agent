@@ -63,9 +63,6 @@ discovery:
       - "/custom/path/*.log"
     exclude:
       - "**/*.old"
-ship:
-  url: "https://test.example.com/ingest"
-  stream_id: "test-stream-id"
 streams:
   - name: "test-stream"
     stream_id: "stream-123"
@@ -84,14 +81,6 @@ streams:
 		t.Errorf("Expected env to be 'staging', got: %s", cfg.Env)
 	}
 
-	if len(cfg.Streams) > 0 && cfg.Streams[0].Key != "test-key-from-yaml" {
-		t.Errorf("Expected stream key to be 'test-key-from-yaml', got: %s", cfg.Streams[0].Key)
-	}
-
-	if cfg.Ship.URL != "https://test.example.com/ingest" {
-		t.Errorf("Expected ship URL to be loaded from YAML, got: %s", cfg.Ship.URL)
-	}
-
 	if len(cfg.Streams) != 1 {
 		t.Errorf("Expected 1 stream from YAML, got: %d", len(cfg.Streams))
 	}
@@ -103,6 +92,9 @@ streams:
 		}
 		if stream.StreamID != "stream-123" {
 			t.Errorf("Expected stream ID 'stream-123', got: %s", stream.StreamID)
+		}
+		if stream.Key != "test-key-from-yaml" {
+			t.Errorf("Expected stream key to be 'test-key-from-yaml', got: %s", stream.Key)
 		}
 	}
 }

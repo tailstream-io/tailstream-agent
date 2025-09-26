@@ -27,13 +27,7 @@ type Config struct {
 		MaxDelayHours int    `yaml:"max_delay_hours"` // Maximum random delay before updating
 	} `yaml:"updates"`
 
-	// Legacy single stream config (for backward compatibility)
-	Ship struct {
-		URL      string `yaml:"url"`
-		StreamID string `yaml:"stream_id"`
-	} `yaml:"ship,omitempty"`
-
-	// New multi-stream configuration
+	// Multi-stream configuration
 	Streams []StreamConfig `yaml:"streams,omitempty"`
 }
 
@@ -49,17 +43,17 @@ type LogFormat struct {
 type StreamConfig struct {
 	Name      string     `yaml:"name"`              // Human-readable name for this stream
 	StreamID  string     `yaml:"stream_id"`         // Stream ID - URL will be constructed as https://app.tailstream.io/api/ingest/{stream_id}
+	URL       string     `yaml:"url,omitempty"`     // Optional custom URL (overrides default URL construction)
 	Key       string     `yaml:"key,omitempty"`     // Optional stream-specific access token
 	Paths     []string   `yaml:"paths"`             // Log file patterns for this stream
 	Exclude   []string   `yaml:"exclude,omitempty"` // Exclusion patterns for this stream
 	Format    *LogFormat `yaml:"format,omitempty"`  // Custom log format for this stream
-	LegacyURL string     `yaml:"-"`                 // Legacy URL override (not saved to YAML)
 }
 
 // GetURL returns the full ingest URL for this stream
 func (sc StreamConfig) GetURL() string {
-	if sc.LegacyURL != "" {
-		return sc.LegacyURL
+	if sc.URL != "" {
+		return sc.URL
 	}
 	return fmt.Sprintf("https://app.tailstream.io/api/ingest/%s", sc.StreamID)
 }

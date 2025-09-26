@@ -12,9 +12,15 @@ func TestDiscover(t *testing.T) {
 	os.WriteFile(filepath.Join(tmp, "b.gz"), []byte("x"), 0o644)
 
 	var cfg Config
-	cfg.Discovery.Paths.Include = []string{filepath.Join(tmp, "*.log"), filepath.Join(tmp, "*.gz")}
-	cfg.Discovery.Paths.Exclude = []string{"**/*.gz"}
-	cfg.Ship.URL = "https://test.example.com"
+	cfg.Streams = []StreamConfig{
+		{
+			Name:     "test-stream",
+			StreamID: "test-123",
+			URL:      "https://test.example.com",
+			Paths:    []string{filepath.Join(tmp, "*.log"), filepath.Join(tmp, "*.gz")},
+			Exclude:  []string{"**/*.gz"},
+		},
+	}
 
 	mappings, err := discover(cfg)
 	if err != nil {

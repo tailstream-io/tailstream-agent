@@ -291,18 +291,8 @@ func main() {
 		log.Fatal("No streams configured. Run setup wizard or create tailstream.yaml")
 	}
 
-	// For legacy single-stream config
-	if len(cfg.Streams) == 0 && cfg.Ship.URL == "" {
-		log.Fatal("No ship URL configured. Run setup wizard or create tailstream.yaml")
-	}
-
 	if os.Getenv("DEBUG") == "1" {
-		if len(cfg.Streams) > 0 {
-			log.Printf("Starting tailstream agent with %d streams (env=%s)", len(cfg.Streams), cfg.Env)
-		} else {
-			log.Printf("Starting tailstream agent (env=%s, url=%s)",
-				cfg.Env, cfg.Ship.URL)
-		}
+		log.Printf("Starting tailstream agent with %d streams (env=%s)", len(cfg.Streams), cfg.Env)
 	}
 
 	mappings, err := discover(cfg)

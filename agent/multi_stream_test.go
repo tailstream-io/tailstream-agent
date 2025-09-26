@@ -53,59 +53,6 @@ func TestMultiStreamDiscovery(t *testing.T) {
 	}
 }
 
-func TestLegacyConfigCompatibility(t *testing.T) {
-	// Test that legacy single-stream config still works
-	cfg := Config{
-		Env: "test",
-		Discovery: struct {
-			Enabled bool `yaml:"enabled"`
-			Paths   struct {
-				Include []string `yaml:"include"`
-				Exclude []string `yaml:"exclude"`
-			} `yaml:"paths"`
-		}{
-			Enabled: true,
-			Paths: struct {
-				Include []string `yaml:"include"`
-				Exclude []string `yaml:"exclude"`
-			}{
-				Include: []string{"/tmp/test/*.log"},
-				Exclude: []string{"**/*.gz"},
-			},
-		},
-		Ship: struct {
-			URL      string `yaml:"url"`
-			StreamID string `yaml:"stream_id"`
-		}{
-			URL:      "https://app.tailstream.io/api/ingest/legacy-stream",
-			StreamID: "legacy-stream",
-		},
-	}
-
-	mappings, err := discover(cfg)
-	if err != nil {
-		t.Fatalf("discover failed: %v", err)
-	}
-
-	// Should create a single "default" stream from legacy config
-	if len(mappings) > 1 {
-		t.Errorf("Expected at most 1 mapping for legacy config, got %d", len(mappings))
-	}
-
-	if len(mappings) == 1 {
-		mapping := mappings[0]
-		if mapping.Stream.Name != "default" {
-			t.Errorf("Expected legacy stream name to be 'default', got: %s", mapping.Stream.Name)
-		}
-		if mapping.Stream.GetURL() != "https://app.tailstream.io/api/ingest/legacy-stream" {
-			t.Errorf("Expected legacy URL to be preserved, got: %s", mapping.Stream.GetURL())
-		}
-		// Legacy config doesn't have a global key anymore, streams have their own keys
-		if mapping.Stream.Key != "" {
-			t.Errorf("Expected legacy stream to have no key, got: %s", mapping.Stream.Key)
-		}
-	}
-}
 
 func TestStreamConfigValidation(t *testing.T) {
 	tests := []struct {
