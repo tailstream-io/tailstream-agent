@@ -20,7 +20,6 @@ type AccessLogEntry struct {
 	RT        float64 `json:"rt"`
 	Bytes     int64   `json:"bytes"`
 	Src       string  `json:"src"`
-	IP        string  `json:"ip,omitempty"`
 	UserAgent string  `json:"user_agent,omitempty"`
 	TS        int64   `json:"ts,omitempty"`
 }
@@ -52,8 +51,7 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 			Status:    status,
 			RT:        rt,
 			Bytes:     bytes,
-			Src:       filename,
-			IP:        matches[1],
+			Src:       matches[1],
 			UserAgent: matches[8],
 		}, true
 	}
@@ -70,8 +68,7 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 			Status:    status,
 			RT:        0.0, // No response time in combined format
 			Bytes:     bytes,
-			Src:       filename,
-			IP:        matches[1],
+			Src:       matches[1],
 			UserAgent: matches[8],
 		}, true
 	}
@@ -88,8 +85,7 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 			Status: status,
 			RT:     0.0, // No response time in common format
 			Bytes:  bytes,
-			Src:    filename,
-			IP:     matches[1],
+			Src:    matches[1],
 		}, true
 	}
 
@@ -126,8 +122,6 @@ func parseCustomFormat(line, filename, hostname string, format *LogFormat) (Even
 	for field, groupName := range format.Fields {
 		if groupName == "hostname" {
 			event[field] = hostname
-		} else if groupName == "filename" {
-			event[field] = filename
 		} else {
 			// Try to parse as group number first
 			if groupNum, err := strconv.Atoi(groupName); err == nil && groupNum > 0 && groupNum < len(matches) {
@@ -164,9 +158,7 @@ func parseCustomFormat(line, filename, hostname string, format *LogFormat) (Even
 	if _, hasHost := event["host"]; !hasHost {
 		event["host"] = hostname
 	}
-	if _, hasSrc := event["src"]; !hasSrc {
-		event["src"] = filename
-	}
+	// Don't automatically set src field - it should only be set by parsing logic for access logs
 
 	return event, true
 }
@@ -187,9 +179,7 @@ func parseLine(ll LogLine, host string, customFormat *LogFormat) (Event, bool) {
 		if _, hasHost := m["host"]; !hasHost {
 			m["host"] = host
 		}
-		if _, hasSrc := m["src"]; !hasSrc {
-			m["src"] = ll.File
-		}
+		// Don't set src to filename for JSON logs - let the JSON data determine it
 		return m, true
 	}
 
