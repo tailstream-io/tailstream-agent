@@ -520,12 +520,10 @@ func createOAuthConfig(streams []StreamConfig) Config {
 			Enabled       bool   `yaml:"enabled"`
 			Channel       string `yaml:"channel"`
 			CheckHours    int    `yaml:"check_hours"`
-			MaxDelayHours int    `yaml:"max_delay_hours"`
 		}{
 			Enabled:       true,
 			Channel:       "stable",
 			CheckHours:    24,
-			MaxDelayHours: 6,
 		},
 		Streams: streams,
 	}
