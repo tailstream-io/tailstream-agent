@@ -22,7 +22,6 @@ func TestParseAccessLog(t *testing.T) {
 				RT:        0.0,
 				Bytes:     18547,
 				Src:       "86.94.167.37",
-				IP:        "86.94.167.37",
 				UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
 			},
 			wantOk: true,
@@ -38,7 +37,6 @@ func TestParseAccessLog(t *testing.T) {
 				RT:        0.123,
 				Bytes:     1024,
 				Src:       "192.168.1.1",
-				IP:        "192.168.1.1",
 				UserAgent: "curl/7.68.0",
 			},
 			wantOk: true,
@@ -54,7 +52,6 @@ func TestParseAccessLog(t *testing.T) {
 				RT:     0.0,
 				Bytes:  2326,
 				Src:    "127.0.0.1",
-				IP:     "127.0.0.1",
 			},
 			wantOk: true,
 		},
@@ -75,7 +72,6 @@ func TestParseAccessLog(t *testing.T) {
 				RT:        0.0,
 				Bytes:     2326,
 				Src:       "10.0.0.1",
-				IP:        "10.0.0.1",
 				UserAgent: "Mozilla/4.08 [en] (Win98; I ;Nav)",
 			},
 			wantOk: true,
@@ -116,8 +112,8 @@ func TestParseAccessLog(t *testing.T) {
 			if result.Bytes != tt.expected.Bytes {
 				t.Errorf("Bytes = %v, want %v", result.Bytes, tt.expected.Bytes)
 			}
-			if result.IP != tt.expected.IP {
-				t.Errorf("IP = %v, want %v", result.IP, tt.expected.IP)
+			if result.Src != tt.expected.Src {
+				t.Errorf("Src = %v, want %v", result.Src, tt.expected.Src)
 			}
 			if result.UserAgent != tt.expected.UserAgent {
 				t.Errorf("UserAgent = %v, want %v", result.UserAgent, tt.expected.UserAgent)

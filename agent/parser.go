@@ -20,7 +20,6 @@ type AccessLogEntry struct {
 	RT        float64 `json:"rt"`
 	Bytes     int64   `json:"bytes"`
 	Src       string  `json:"src"`
-	IP        string  `json:"ip,omitempty"`
 	UserAgent string  `json:"user_agent,omitempty"`
 	TS        int64   `json:"ts,omitempty"`
 }
@@ -53,7 +52,6 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 			RT:        rt,
 			Bytes:     bytes,
 			Src:       matches[1],
-			IP:        matches[1],
 			UserAgent: matches[8],
 		}, true
 	}
@@ -71,7 +69,6 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 			RT:        0.0, // No response time in combined format
 			Bytes:     bytes,
 			Src:       matches[1],
-			IP:        matches[1],
 			UserAgent: matches[8],
 		}, true
 	}
@@ -89,7 +86,6 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 			RT:     0.0, // No response time in common format
 			Bytes:  bytes,
 			Src:    matches[1],
-			IP:     matches[1],
 		}, true
 	}
 
