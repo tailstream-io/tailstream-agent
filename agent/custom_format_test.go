@@ -10,11 +10,12 @@ func TestCustomLogFormat(t *testing.T) {
 		Name:    "app-log",
 		Pattern: `\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+): (.+)`,
 		Fields: map[string]string{
-			"method": "2",      // Log level (INFO, ERROR, etc)
-			"path":   "3",      // Component name
-			"status": "200",    // Default status for app logs
-			"rt":     "0.0",    // Default response time
-			"bytes":  "0",      // Default bytes
+			"method": "2",        // Log level (INFO, ERROR, etc)
+			"path":   "3",        // Component name
+			"status": "200",      // Default status for app logs
+			"rt":     "0.0",      // Default response time
+			"bytes":  "0",        // Default bytes
+			"src":    "filename", // Use filename for src
 		},
 		Default: map[string]any{
 			"status": 200,
