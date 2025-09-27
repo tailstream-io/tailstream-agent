@@ -122,8 +122,6 @@ func parseCustomFormat(line, filename, hostname string, format *LogFormat) (Even
 	for field, groupName := range format.Fields {
 		if groupName == "hostname" {
 			event[field] = hostname
-		} else if groupName == "filename" {
-			event[field] = filename
 		} else {
 			// Try to parse as group number first
 			if groupNum, err := strconv.Atoi(groupName); err == nil && groupNum > 0 && groupNum < len(matches) {
@@ -160,14 +158,7 @@ func parseCustomFormat(line, filename, hostname string, format *LogFormat) (Even
 	if _, hasHost := event["host"]; !hasHost {
 		event["host"] = hostname
 	}
-	// Only set src to filename if it wasn't explicitly mapped to something else in the custom format
-	if _, hasSrc := event["src"]; !hasSrc {
-		// Check if src was explicitly mapped to "filename" in the format
-		if srcMapping, ok := format.Fields["src"]; ok && srcMapping == "filename" {
-			event["src"] = filename
-		}
-		// Otherwise, don't set src automatically - let it be determined by parsing logic
-	}
+	// Don't automatically set src field - it should only be set by parsing logic for access logs
 
 	return event, true
 }

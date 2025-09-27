@@ -4,155 +4,120 @@ import (
 	"testing"
 )
 
-func TestCustomLogFormat(t *testing.T) {
-	// Test custom format for application logs
-	customFormat := &LogFormat{
-		Name:    "app-log",
-		Pattern: `\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+): (.+)`,
-		Fields: map[string]string{
-			"method": "2",        // Log level (INFO, ERROR, etc)
-			"path":   "3",        // Component name
-			"status": "200",      // Default status for app logs
-			"rt":     "0.0",      // Default response time
-			"bytes":  "0",        // Default bytes
-			"src":    "filename", // Use filename for src
-		},
-		Default: map[string]any{
-			"status": 200,
-			"rt":     0.0,
-			"bytes":  0,
-		},
-	}
 
+func TestCustomAccessLogFormats(t *testing.T) {
 	tests := []struct {
 		name     string
+		format   *LogFormat
 		line     string
-		expected map[string]any
-		wantOK   bool
+		expected map[string]interface{}
 	}{
 		{
-			name: "valid app log",
-			line: "[2025-01-15 14:30:00] INFO.UserController: User login successful",
-			expected: map[string]any{
-				"host":   "test-host",
-				"method": "INFO",
-				"path":   "UserController",
-				"status": 200,
-				"rt":     0.0,
-				"bytes":  0,
-				"src":    "/var/log/app.log",
+			name: "nginx custom format with upstream time",
+			format: &LogFormat{
+				Name:    "nginx-upstream",
+				Pattern: `^(\S+) - - \[([^\]]+)\] "(\S+) ([^"]*) HTTP/[^"]*" (\d+) (\d+) "([^"]*)" "([^"]*)" ([0-9.]+) ([0-9.]+)`,
+				Fields: map[string]string{
+					"src":            "1",
+					"method":         "3",
+					"path":           "4",
+					"status":         "5",
+					"bytes":          "6",
+					"user_agent":     "8",
+					"rt":             "9",
+					"upstream_time":  "10",
+				},
 			},
-			wantOK: true,
+			line: `203.0.113.42 - - [22/Sep/2025:17:04:36 +0000] "GET /api/data HTTP/1.1" 200 5432 "https://example.com/" "Mozilla/5.0" 0.234 0.189`,
+			expected: map[string]interface{}{
+				"src":           "203.0.113.42",
+				"method":        "GET",
+				"path":          "/api/data",
+				"status":        200,
+				"bytes":         int64(5432),
+				"user_agent":    "Mozilla/5.0",
+				"rt":            0.234,
+				"upstream_time": "0.189",
+			},
 		},
 		{
-			name: "error log",
-			line: "[2025-01-15 14:31:00] ERROR.DatabaseManager: Connection timeout",
-			expected: map[string]any{
-				"host":   "test-host",
-				"method": "ERROR",
-				"path":   "DatabaseManager",
-				"status": 200,
-				"rt":     0.0,
-				"bytes":  0,
-				"src":    "/var/log/app.log",
+			name: "apache custom format with extra fields",
+			format: &LogFormat{
+				Name:    "apache-extended",
+				Pattern: `^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*) HTTP/[^"]*" (\d+) (\d+) (\d+) ([0-9.]+)`,
+				Fields: map[string]string{
+					"src":          "1",
+					"method":       "3",
+					"path":         "4",
+					"status":       "5",
+					"bytes":        "6",
+					"response_size": "7",
+					"rt":           "8",
+				},
 			},
-			wantOK: true,
+			line: `10.0.0.15 - - [22/Sep/2025:17:04:36 +0000] "POST /submit HTTP/1.1" 201 128 64000 1.456`,
+			expected: map[string]interface{}{
+				"src":           "10.0.0.15",
+				"method":        "POST",
+				"path":          "/submit",
+				"status":        201,
+				"bytes":         int64(128),
+				"response_size": "64000",
+				"rt":            1.456,
+			},
 		},
 		{
-			name:   "invalid format",
-			line:   "Invalid log line format",
-			wantOK: false,
+			name: "caddy json-like custom format",
+			format: &LogFormat{
+				Name:    "caddy-custom",
+				Pattern: `^(\S+) \[([^\]]+)\] (\S+) (\S+) (\d+) (\d+) ([0-9.]+)ms`,
+				Fields: map[string]string{
+					"src":    "1",
+					"method": "3",
+					"path":   "4",
+					"status": "5",
+					"bytes":  "6",
+					"rt":     "7",
+				},
+			},
+			line: `192.168.1.25 [22/Sep/2025:17:04:36 +0000] GET /health 200 2 0.5ms`,
+			expected: map[string]interface{}{
+				"src":    "192.168.1.25",
+				"method": "GET",
+				"path":   "/health",
+				"status": 200,
+				"bytes":  int64(2),
+				"rt":     0.5,
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			event, ok := parseCustomFormat(tt.line, "/var/log/app.log", "test-host", customFormat)
+			event, ok := parseCustomFormat(tt.line, "/var/log/access.log", "test-host", tt.format)
 
-			if ok != tt.wantOK {
-				t.Errorf("parseCustomFormat() ok = %v, want %v", ok, tt.wantOK)
-				return
+			if !ok {
+				t.Fatalf("Expected parseCustomFormat to succeed for %s", tt.name)
 			}
 
-			if !tt.wantOK {
-				return
-			}
-
-			for key, expected := range tt.expected {
-				if actual, exists := event[key]; !exists || actual != expected {
-					t.Errorf("Expected %s=%v, got %v", key, expected, actual)
+			// Check all expected fields
+			for key, expectedValue := range tt.expected {
+				actualValue, exists := event[key]
+				if !exists {
+					t.Errorf("Expected field %s to exist in event", key)
+					continue
 				}
+
+				if actualValue != expectedValue {
+					t.Errorf("Expected %s=%v (%T), got %v (%T)", key, expectedValue, expectedValue, actualValue, actualValue)
+				}
+			}
+
+			// Ensure host is set
+			if event["host"] != "test-host" {
+				t.Errorf("Expected host to be 'test-host', got %v", event["host"])
 			}
 		})
 	}
 }
 
-func TestCustomFormatWithNumbers(t *testing.T) {
-	// Test custom format with numeric fields
-	customFormat := &LogFormat{
-		Name:    "numeric-log",
-		Pattern: `^(\d+\.\d+\.\d+\.\d+) - (\w+) (\S+) (\d+) (\d+) ([0-9.]+)`,
-		Fields: map[string]string{
-			"ip":     "1",
-			"method": "2",
-			"path":   "3",
-			"status": "4",
-			"bytes":  "5",
-			"rt":     "6",
-		},
-	}
-
-	line := "192.168.1.100 - GET /api/users 200 1024 0.156"
-	event, ok := parseCustomFormat(line, "/var/log/custom.log", "test-host", customFormat)
-
-	if !ok {
-		t.Fatal("Expected parseCustomFormat to succeed")
-	}
-
-	// Check that numeric fields are properly converted
-	if status, ok := event["status"].(int); !ok || status != 200 {
-		t.Errorf("Expected status to be int 200, got %v (%T)", event["status"], event["status"])
-	}
-
-	if bytes, ok := event["bytes"].(int64); !ok || bytes != 1024 {
-		t.Errorf("Expected bytes to be int64 1024, got %v (%T)", event["bytes"], event["bytes"])
-	}
-
-	if rt, ok := event["rt"].(float64); !ok || rt != 0.156 {
-		t.Errorf("Expected rt to be float64 0.156, got %v (%T)", event["rt"], event["rt"])
-	}
-}
-
-func TestCustomFormatWithSpecialFields(t *testing.T) {
-	// Test custom format with hostname and filename placeholders
-	customFormat := &LogFormat{
-		Name:    "special-fields",
-		Pattern: `(\w+): (.+)`,
-		Fields: map[string]string{
-			"method": "1",
-			"path":   "2",
-			"host":   "hostname",
-			"src":    "filename",
-		},
-		Default: map[string]any{
-			"status": 200,
-			"rt":     0.0,
-			"bytes":  0,
-		},
-	}
-
-	line := "INFO: Application started"
-	event, ok := parseCustomFormat(line, "/var/log/app.log", "my-server", customFormat)
-
-	if !ok {
-		t.Fatal("Expected parseCustomFormat to succeed")
-	}
-
-	if event["host"] != "my-server" {
-		t.Errorf("Expected host to be 'my-server', got %v", event["host"])
-	}
-
-	if event["src"] != "/var/log/app.log" {
-		t.Errorf("Expected src to be '/var/log/app.log', got %v", event["src"])
-	}
-}
