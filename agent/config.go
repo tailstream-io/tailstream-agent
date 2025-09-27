@@ -24,7 +24,6 @@ type Config struct {
 		Enabled       bool   `yaml:"enabled"`         // Enable automatic updates
 		Channel       string `yaml:"channel"`         // stable, beta, or latest
 		CheckHours    int    `yaml:"check_hours"`     // Hours between update checks
-		MaxDelayHours int    `yaml:"max_delay_hours"` // Maximum random delay before updating
 	} `yaml:"updates"`
 
 	// Multi-stream configuration
@@ -77,7 +76,6 @@ func loadConfig() Config {
 	cfg.Updates.Enabled = true
 	cfg.Updates.Channel = "stable"
 	cfg.Updates.CheckHours = 1
-	cfg.Updates.MaxDelayHours = 6
 
 	// Parse flags only if not already parsed (to avoid redefinition in tests)
 	if !flag.Parsed() {

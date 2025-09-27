@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -462,12 +461,6 @@ func checkForUpdatesForce(cfg Config, force bool) {
 		return
 	}
 
-	// Add random delay to prevent all instances updating simultaneously
-	if cfg.Updates.MaxDelayHours > 0 {
-		delay := time.Duration(rand.Intn(cfg.Updates.MaxDelayHours)) * time.Hour
-		log.Printf("Delaying update by %v to stagger deployments", delay)
-		time.Sleep(delay)
-	}
 
 	// Perform the self-update
 	if err := performSelfUpdate(updateInfo); err != nil {
