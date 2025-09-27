@@ -52,7 +52,7 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 			Status:    status,
 			RT:        rt,
 			Bytes:     bytes,
-			Src:       filename,
+			Src:       matches[1],
 			IP:        matches[1],
 			UserAgent: matches[8],
 		}, true
@@ -70,7 +70,7 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 			Status:    status,
 			RT:        0.0, // No response time in combined format
 			Bytes:     bytes,
-			Src:       filename,
+			Src:       matches[1],
 			IP:        matches[1],
 			UserAgent: matches[8],
 		}, true
@@ -88,7 +88,7 @@ func parseAccessLog(line, filename, hostname string) (*AccessLogEntry, bool) {
 			Status: status,
 			RT:     0.0, // No response time in common format
 			Bytes:  bytes,
-			Src:    filename,
+			Src:    matches[1],
 			IP:     matches[1],
 		}, true
 	}
@@ -164,8 +164,13 @@ func parseCustomFormat(line, filename, hostname string, format *LogFormat) (Even
 	if _, hasHost := event["host"]; !hasHost {
 		event["host"] = hostname
 	}
+	// Only set src to filename if it wasn't explicitly mapped to something else in the custom format
 	if _, hasSrc := event["src"]; !hasSrc {
-		event["src"] = filename
+		// Check if src was explicitly mapped to "filename" in the format
+		if srcMapping, ok := format.Fields["src"]; ok && srcMapping == "filename" {
+			event["src"] = filename
+		}
+		// Otherwise, don't set src automatically - let it be determined by parsing logic
 	}
 
 	return event, true
@@ -187,9 +192,7 @@ func parseLine(ll LogLine, host string, customFormat *LogFormat) (Event, bool) {
 		if _, hasHost := m["host"]; !hasHost {
 			m["host"] = host
 		}
-		if _, hasSrc := m["src"]; !hasSrc {
-			m["src"] = ll.File
-		}
+		// Don't set src to filename for JSON logs - let the JSON data determine it
 		return m, true
 	}
 
