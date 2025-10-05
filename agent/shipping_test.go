@@ -29,7 +29,7 @@ func TestShipEvents(t *testing.T) {
 			},
 			globalKey: "global-key",
 			events: []Event{
-				{"host": "test", "path": "/test", "method": "GET", "status": 200, "rt": 0.1, "bytes": 100, "src": "test.log"},
+				map[string]interface{}{"host": "test", "path": "/test", "method": "GET", "status": 200, "rt": 0.1, "bytes": 100, "src": "test.log"},
 			},
 			serverResponse: 200,
 			serverBody:     `{"accepted": 1}`,
@@ -45,7 +45,7 @@ func TestShipEvents(t *testing.T) {
 			},
 			globalKey: "global-key",
 			events: []Event{
-				{"host": "test", "path": "/test", "method": "GET", "status": 200, "rt": 0.1, "bytes": 100, "src": "test.log"},
+				map[string]interface{}{"host": "test", "path": "/test", "method": "GET", "status": 200, "rt": 0.1, "bytes": 100, "src": "test.log"},
 			},
 			serverResponse: 200,
 			serverBody:     `{"accepted": 1}`,
@@ -60,7 +60,7 @@ func TestShipEvents(t *testing.T) {
 				Key:      "test-key",
 			},
 			events: []Event{
-				{"host": "test", "path": "/test", "method": "GET", "status": 200, "rt": 0.1, "bytes": 100, "src": "test.log"},
+				map[string]interface{}{"host": "test", "path": "/test", "method": "GET", "status": 200, "rt": 0.1, "bytes": 100, "src": "test.log"},
 			},
 			serverResponse: 401,
 			serverBody:     `{"error": "unauthorized"}`,

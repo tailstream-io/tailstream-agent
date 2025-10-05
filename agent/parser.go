@@ -9,7 +9,8 @@ import (
 )
 
 // Event is the normalized record to send to Tailstream.
-type Event map[string]interface{}
+// It can be either a structured JSON object (map) or a raw text string.
+type Event interface{}
 
 // AccessLogEntry represents a parsed access log entry
 type AccessLogEntry struct {
@@ -111,7 +112,7 @@ func parseCustomFormat(line, filename, hostname string, format *LogFormat) (Even
 		return nil, false
 	}
 
-	event := make(Event)
+	event := make(map[string]interface{})
 
 	// Apply default values first
 	for key, value := range format.Default {
@@ -192,9 +193,7 @@ func parseLine(ll LogLine, host string, customFormat *LogFormat) (Event, bool) {
 		return event, true
 	}
 
-	// Skip unparseable lines
-	if os.Getenv("DEBUG") == "1" {
-		log.Printf("Skipping unparseable line from %s: %s", ll.File, ll.Line)
-	}
-	return nil, false
+	// Fallback: send as raw text log (backend will parse it)
+	// Backend auto-detects format for plain text, syslog, Laravel logs, etc.
+	return ll.Line, true
 }

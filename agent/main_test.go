@@ -42,7 +42,11 @@ func TestParseLineJSON(t *testing.T) {
 	if !ok {
 		t.Fatal("not parsed")
 	}
-	if ev["msg"] != "hi" || ev["host"] != "host1" || ev["src"] != "/var/log/test.log" {
-		t.Fatalf("bad event: %#v", ev)
+	evMap, ok := ev.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected event to be a map, got type: %T", ev)
+	}
+	if evMap["msg"] != "hi" || evMap["host"] != "host1" || evMap["src"] != "/var/log/test.log" {
+		t.Fatalf("bad event: %#v", evMap)
 	}
 }

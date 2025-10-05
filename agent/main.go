@@ -147,12 +147,21 @@ func shipEvents(ctx context.Context, stream StreamConfig, globalKey string, even
 	// Convert events to NDJSON format
 	var buf bytes.Buffer
 	for _, event := range events {
-		data, err := json.Marshal(event)
-		if err != nil {
-			continue
+		// Check if event is a raw string or structured JSON
+		switch v := event.(type) {
+		case string:
+			// Raw text log - send as-is
+			buf.WriteString(v)
+			buf.WriteByte('\n')
+		default:
+			// Structured JSON - marshal and send
+			data, err := json.Marshal(event)
+			if err != nil {
+				continue
+			}
+			buf.Write(data)
+			buf.WriteByte('\n')
 		}
-		buf.Write(data)
-		buf.WriteByte('\n')
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &buf)
