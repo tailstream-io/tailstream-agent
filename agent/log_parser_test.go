@@ -124,27 +124,46 @@ func TestParseAccessLog(t *testing.T) {
 
 func TestParseLineIntegration(t *testing.T) {
 	tests := []struct {
-		name     string
-		line     string
-		wantOk   bool
-		checkKey string
+		name           string
+		line           string
+		wantOk         bool
+		checkKey       string
+		requiredFields []string
 	}{
 		{
-			name:     "valid access log",
-			line:     `192.168.1.1 - - [22/Sep/2025:17:04:36 +0000] "GET /test HTTP/1.1" 200 1024 "https://example.com/" "curl/7.68.0"`,
-			wantOk:   true,
-			checkKey: "path",
+			name:           "valid access log",
+			line:           `192.168.1.1 - - [22/Sep/2025:17:04:36 +0000] "GET /test HTTP/1.1" 200 1024 "https://example.com/" "curl/7.68.0"`,
+			wantOk:         true,
+			checkKey:       "path",
+			requiredFields: []string{"host", "path", "method", "status", "rt", "bytes", "src"},
 		},
 		{
-			name:     "valid JSON log",
-			line:     `{"host":"server1","path":"/api","method":"GET","status":200,"rt":0.1,"bytes":500,"src":"test.log"}`,
-			wantOk:   true,
-			checkKey: "path",
+			name:           "valid JSON log",
+			line:           `{"host":"server1","path":"/api","method":"GET","status":200,"rt":0.1,"bytes":500,"src":"test.log"}`,
+			wantOk:         true,
+			checkKey:       "path",
+			requiredFields: []string{"host", "path", "method", "status", "rt", "bytes", "src"},
 		},
 		{
-			name:   "invalid log",
-			line:   "random text that cannot be parsed",
-			wantOk: false,
+			name:           "plain text syslog",
+			line:           "2024-01-15T10:30:45Z ERROR Database connection failed after 3 retries",
+			wantOk:         true,
+			checkKey:       "", // Raw string, no key to check
+			requiredFields: []string{},
+		},
+		{
+			name:           "plain text application log",
+			line:           "[2024-01-15 10:30:45] production.ERROR: Connection timeout",
+			wantOk:         true,
+			checkKey:       "", // Raw string, no key to check
+			requiredFields: []string{},
+		},
+		{
+			name:           "random text",
+			line:           "random text that cannot be parsed",
+			wantOk:         true,
+			checkKey:       "", // Raw string, no key to check
+			requiredFields: []string{},
 		},
 	}
 
@@ -158,16 +177,36 @@ func TestParseLineIntegration(t *testing.T) {
 				return
 			}
 
-			if tt.wantOk && event != nil {
-				if _, hasKey := event[tt.checkKey]; !hasKey {
-					t.Errorf("Expected key %s not found in event: %+v", tt.checkKey, event)
+			if !tt.wantOk {
+				return
+			}
+
+			// Check if this is a raw string event or structured event
+			if tt.checkKey == "" {
+				// Should be a raw string
+				if str, ok := event.(string); ok {
+					if str != tt.line {
+						t.Errorf("Expected raw string to match original line. Got: %s, Want: %s", str, tt.line)
+					}
+				} else {
+					t.Errorf("Expected event to be a raw string, got type: %T", event)
+				}
+			} else {
+				// Should be a structured event (map)
+				eventMap, ok := event.(map[string]interface{})
+				if !ok {
+					t.Errorf("Expected event to be a map, got type: %T", event)
+					return
+				}
+
+				if _, hasKey := eventMap[tt.checkKey]; !hasKey {
+					t.Errorf("Expected key %s not found in event: %+v", tt.checkKey, eventMap)
 				}
 
 				// Verify required fields are present
-				requiredFields := []string{"host", "path", "method", "status", "rt", "bytes", "src"}
-				for _, field := range requiredFields {
-					if _, has := event[field]; !has {
-						t.Errorf("Required field %s missing from event: %+v", field, event)
+				for _, field := range tt.requiredFields {
+					if _, has := eventMap[field]; !has {
+						t.Errorf("Required field %s missing from event: %+v", field, eventMap)
 					}
 				}
 			}

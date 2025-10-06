@@ -1,6 +1,6 @@
 # Tailstream Agent
 
-A lightweight Go agent that automatically discovers and parses common web server access logs, converting them to structured JSON format and shipping them to the Tailstream ingest API for real-time log analysis.
+A lightweight Go agent that automatically discovers and ships logs to the Tailstream ingest API for real-time log analysis. Supports web server access logs, JSON logs, custom formats, and raw text logs.
 
 ## ⚡ Quick Start
 
@@ -294,6 +294,8 @@ streams:
 - **Organized log routing**: Route nginx logs, application logs, and system logs separately
 - **Flexible patterns**: Each stream can have its own include/exclude patterns
 - **Custom log formats**: Define custom regex patterns to parse application-specific logs
+- **Auto-format detection**: Each stream automatically detects formats (JSON, access logs, plain text)
+- **Mixed formats per stream**: A single stream can handle multiple file formats simultaneously
 - **Backward compatible**: Existing single-stream configs continue to work
 
 ### Custom Log Formats
@@ -472,42 +474,24 @@ Note: With environment variables only, you'll need to run the setup wizard on fi
 
 1. **Discovery**: The agent scans filesystem paths using glob patterns to find log files
 2. **Tailing**: Continuously monitors discovered files for new lines (similar to `tail -f`)
-3. **Parsing**: Intelligently parses common access log formats into structured JSON
-4. **Normalization**: Converts all logs to Tailstream's required NDJSON format
-5. **Batching**: Collects up to 100 events or waits 2 seconds before shipping
-6. **Shipping**: Sends batches via HTTP POST to Tailstream ingest API as NDJSON
+3. **Parsing**: Automatically detects and parses log formats
+4. **Batching**: Collects up to 100 events or waits 2 seconds before shipping
+5. **Shipping**: Sends batches via HTTP POST to Tailstream ingest API as NDJSON
 
 ### Supported Log Formats
 
-The agent automatically detects and parses:
+The agent automatically detects and handles multiple log formats:
 
-#### **Access Logs** (converted to structured JSON)
-- **Nginx Combined Format**: `IP - - [timestamp] "METHOD path HTTP/version" status bytes "referer" "user-agent"`
-- **Nginx with Response Time**: Same as above + response time at the end
-- **Apache Common Format**: `IP - - [timestamp] "METHOD path HTTP/version" status bytes`
-- **Apache Combined Format**: Common format + referer and user-agent
+#### **Auto-Detected Formats**
+- **Nginx/Apache Access Logs** - Automatically parsed to structured JSON
+- **JSON Logs** - Validated and forwarded as JSON
+- **Plain Text Logs** - Sent as-is (syslogs, application logs, etc.)
+  - Backend auto-detects format for Laravel logs, syslogs, and other text formats
 
-#### **JSON Logs**
-- Pre-structured JSON logs are validated and forwarded with required fields
-
-#### **Output Format**
-All logs are converted to this structured format required by Tailstream:
-```json
-{
-  "host": "server-hostname",
-  "path": "/api/endpoint",
-  "method": "GET",
-  "status": 200,
-  "rt": 0.123,
-  "bytes": 1024,
-  "src": "/var/log/nginx/access.log",
-  "ip": "192.168.1.1",
-  "user_agent": "Mozilla/5.0..."
-}
-```
-
-**Required Fields:** `host`, `path`, `method`, `status`, `rt`, `bytes`, `src`
-**Optional Fields:** `ip`, `user_agent`, `ts`
+#### **Custom Formats**
+- Define custom regex patterns per stream
+- Map log fields to structured output
+- See "Custom Log Formats" section for examples
 
 ## Testing
 

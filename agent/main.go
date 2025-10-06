@@ -147,6 +147,9 @@ func shipEvents(ctx context.Context, stream StreamConfig, globalKey string, even
 	// Convert events to NDJSON format
 	var buf bytes.Buffer
 	for _, event := range events {
+		// Marshal event to JSON (handles both strings and objects)
+		// - Strings become JSON strings: "raw text here\n"
+		// - Objects become JSON objects: {"field":"value"}
 		data, err := json.Marshal(event)
 		if err != nil {
 			continue

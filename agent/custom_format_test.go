@@ -100,9 +100,15 @@ func TestCustomAccessLogFormats(t *testing.T) {
 				t.Fatalf("Expected parseCustomFormat to succeed for %s", tt.name)
 			}
 
+			// Event should be a map for custom formats
+			eventMap, ok := event.(map[string]interface{})
+			if !ok {
+				t.Fatalf("Expected event to be a map, got type: %T", event)
+			}
+
 			// Check all expected fields
 			for key, expectedValue := range tt.expected {
-				actualValue, exists := event[key]
+				actualValue, exists := eventMap[key]
 				if !exists {
 					t.Errorf("Expected field %s to exist in event", key)
 					continue
@@ -114,8 +120,8 @@ func TestCustomAccessLogFormats(t *testing.T) {
 			}
 
 			// Ensure host is set
-			if event["host"] != "test-host" {
-				t.Errorf("Expected host to be 'test-host', got %v", event["host"])
+			if eventMap["host"] != "test-host" {
+				t.Errorf("Expected host to be 'test-host', got %v", eventMap["host"])
 			}
 		})
 	}
