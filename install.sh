@@ -468,9 +468,9 @@ main() {
     fi
     print_status "Latest version: $version"
 
-    # Install
-    download_binary "$arch" "$version"
+    # Install (create user BEFORE downloading binary to fix ownership step)
     create_user
+    download_binary "$arch" "$version"
     create_config_dir
     setup_log_permissions
     create_service

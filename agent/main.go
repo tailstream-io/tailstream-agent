@@ -192,6 +192,128 @@ func shipEvents(ctx context.Context, stream StreamConfig, globalKey string, even
 	return nil
 }
 
+// runStdinMode processes logs from stdin and ships them to a stream
+func runStdinMode(cfg Config) {
+	// Get stream ID from flag or environment
+	streamID := os.Getenv("TAILSTREAM_STREAM_ID")
+	if streamID == "" {
+		log.Fatal("stdin mode requires --stream-id flag")
+	}
+
+	// Get access token from multiple sources (in priority order):
+	// 1. --key-file flag
+	// 2. TAILSTREAM_KEY environment variable
+	// 3. Config file
+	accessToken := ""
+
+	// Try key file first
+	if keyFile := os.Getenv("TAILSTREAM_KEY_FILE"); keyFile != "" {
+		keyBytes, err := os.ReadFile(keyFile)
+		if err != nil {
+			log.Fatalf("failed to read key file %s: %v", keyFile, err)
+		}
+		accessToken = strings.TrimSpace(string(keyBytes))
+	}
+
+	// Fall back to environment variable
+	if accessToken == "" {
+		accessToken = os.Getenv("TAILSTREAM_KEY")
+	}
+
+	// Fall back to config file
+	if accessToken == "" && len(cfg.Streams) > 0 && cfg.Streams[0].Key != "" {
+		accessToken = cfg.Streams[0].Key
+	}
+
+	if accessToken == "" {
+		log.Fatal("stdin mode requires authentication via --key-file, TAILSTREAM_KEY environment variable, or config file with access token")
+	}
+
+	// Create a stream config for stdin mode
+	stream := StreamConfig{
+		Name:     "stdin",
+		StreamID: streamID,
+		Key:      accessToken,
+	}
+
+	host, _ := os.Hostname()
+	ctx := context.Background()
+
+	scanner := bufio.NewScanner(os.Stdin)
+	batch := make([]Event, 0, 100)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	if os.Getenv("DEBUG") == "1" {
+		log.Printf("Starting stdin mode for stream: %s", streamID)
+	}
+
+	// Channel for new lines
+	lines := make(chan string, 100)
+
+	// Read stdin in goroutine
+	go func() {
+		for scanner.Scan() {
+			lines <- scanner.Text()
+		}
+		if err := scanner.Err(); err != nil {
+			log.Printf("Error reading stdin: %v", err)
+		}
+		close(lines) // Close channel instead of sending done signal
+	}()
+
+	// Process lines
+	running := true
+	for running {
+		select {
+		case <-ticker.C:
+			if len(batch) > 0 {
+				if os.Getenv("DEBUG") == "1" {
+					log.Printf("Timer tick, shipping %d events", len(batch))
+				}
+				if err := shipEvents(ctx, stream, "", batch); err != nil {
+					log.Printf("ship: %v", err)
+				}
+				batch = batch[:0]
+			}
+
+		case line, ok := <-lines:
+			if !ok {
+				// Channel closed, process remaining batch and exit
+				running = false
+				break
+			}
+			if os.Getenv("DEBUG") == "1" {
+				log.Printf("Processing line: %s", line)
+			}
+			ll := LogLine{File: "stdin", Line: line}
+			ev, ok := parseLine(ll, host, stream.Format)
+			if ok && ev != nil {
+				batch = append(batch, ev)
+				if len(batch) >= 100 {
+					if os.Getenv("DEBUG") == "1" {
+						log.Printf("Batch full, shipping %d events", len(batch))
+					}
+					if err := shipEvents(ctx, stream, "", batch); err != nil {
+						log.Printf("ship: %v", err)
+					}
+					batch = batch[:0]
+				}
+			}
+		}
+	}
+
+	// Ship any remaining events after stdin closes
+	if len(batch) > 0 {
+		if os.Getenv("DEBUG") == "1" {
+			log.Printf("EOF, shipping final %d events", len(batch))
+		}
+		if err := shipEvents(ctx, stream, "", batch); err != nil {
+			log.Printf("ship: %v", err)
+		}
+	}
+}
+
 func main() {
 	// Handle version command
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v" || os.Args[1] == "version") {
@@ -205,7 +327,8 @@ func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h" || os.Args[1] == "help") {
 		fmt.Printf("Tailstream Agent %s\n\n", Version)
 		fmt.Printf("USAGE:\n")
-		fmt.Printf("  tailstream-agent [COMMAND]\n\n")
+		fmt.Printf("  tailstream-agent [COMMAND]\n")
+		fmt.Printf("  <command> | tailstream-agent --stream-id <id>    # Stdin mode\n\n")
 		fmt.Printf("COMMANDS:\n")
 		fmt.Printf("  (none)       Start the agent (runs OAuth setup if needed)\n")
 		fmt.Printf("  oauth        Run OAuth setup wizard\n")
@@ -216,18 +339,28 @@ func main() {
 		fmt.Printf("  help         Show this help message\n\n")
 		fmt.Printf("OPTIONS:\n")
 		fmt.Printf("  --config     Path to configuration file\n")
+		fmt.Printf("  --stream-id  Stream ID for stdin mode (pipe logs directly)\n")
+		fmt.Printf("  --key-file   Path to file containing access token (for stdin mode)\n")
 		fmt.Printf("  --version    Show version information\n")
 		fmt.Printf("  --help       Show this help message\n\n")
 		fmt.Printf("ENVIRONMENT VARIABLES:\n")
 		fmt.Printf("  TAILSTREAM_BASE_URL    Override default API base URL\n")
 		fmt.Printf("  TAILSTREAM_KEY         Access token for authentication\n\n")
 		fmt.Printf("EXAMPLES:\n")
+		fmt.Printf("  # Standard file-based mode:\n")
 		fmt.Printf("  tailstream-agent                           # Start with OAuth setup\n")
 		fmt.Printf("  tailstream-agent setup                     # Run legacy setup wizard\n")
-		fmt.Printf("  TAILSTREAM_BASE_URL=https://dev.example.com tailstream-agent\n")
 		fmt.Printf("  tailstream-agent --config /path/config.yaml\n")
 		fmt.Printf("  tailstream-agent update                    # Manual update check\n")
-		fmt.Printf("  tailstream-agent status                    # Check status\n")
+		fmt.Printf("  tailstream-agent status                    # Check status\n\n")
+		fmt.Printf("  # Stdin mode (pipe any log source):\n")
+		fmt.Printf("  # First, securely store your access token:\n")
+		fmt.Printf("  echo 'your-access-token' > ~/.tailstream-key && chmod 600 ~/.tailstream-key\n\n")
+		fmt.Printf("  # Then pipe logs directly:\n")
+		fmt.Printf("  tail -f /var/log/nginx/access.log | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
+		fmt.Printf("  kubectl logs -f pod-name | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
+		fmt.Printf("  docker logs -f container | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
+		fmt.Printf("  journalctl -f | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
 		return
 	}
 
@@ -283,6 +416,14 @@ func main() {
 			checkForUpdatesForce(cfg, true)
 			return
 		}
+	}
+
+	// Check for stdin mode
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		// stdin is a pipe - enter stdin mode
+		runStdinMode(cfg)
+		return
 	}
 
 	// Check for updates in the background
