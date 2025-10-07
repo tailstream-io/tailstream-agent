@@ -240,6 +240,10 @@ func runStdinMode(cfg Config) {
 	ctx := context.Background()
 
 	scanner := bufio.NewScanner(os.Stdin)
+	// Increase buffer size to handle large log lines (e.g., verbose JSON payloads, stack traces)
+	// Default is 64 KiB, we increase to 1 MiB
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
 	batch := make([]Event, 0, 100)
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
