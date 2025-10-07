@@ -47,6 +47,8 @@ sudo -u tailstream tailstream-agent
 1. **Download** the binary for your platform:
    - **Linux (x86_64)**: [tailstream-agent-linux-amd64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-linux-amd64)
    - **Linux (ARM64)**: [tailstream-agent-linux-arm64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-linux-arm64)
+   - **macOS (ARM64)**: [tailstream-agent-darwin-arm64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-darwin-arm64)
+   - **macOS (x86_64)**: [tailstream-agent-darwin-amd64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-darwin-amd64)
    - **All releases**: [GitHub Releases](https://github.com/tailstream-io/tailstream-agent/releases)
 2. **Make executable and run setup** (first time only):
    ```bash
