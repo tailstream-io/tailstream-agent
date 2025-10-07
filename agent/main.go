@@ -192,6 +192,132 @@ func shipEvents(ctx context.Context, stream StreamConfig, globalKey string, even
 	return nil
 }
 
+// runStdinMode processes logs from stdin and ships them to a stream
+func runStdinMode(cfg Config) {
+	// Get stream ID from flag or environment
+	streamID := os.Getenv("TAILSTREAM_STREAM_ID")
+	if streamID == "" {
+		log.Fatal("stdin mode requires --stream-id flag")
+	}
+
+	// Get access token from multiple sources (in priority order):
+	// 1. --key-file flag
+	// 2. TAILSTREAM_KEY environment variable
+	// 3. Config file
+	accessToken := ""
+
+	// Try key file first
+	if keyFile := os.Getenv("TAILSTREAM_KEY_FILE"); keyFile != "" {
+		keyBytes, err := os.ReadFile(keyFile)
+		if err != nil {
+			log.Fatalf("failed to read key file %s: %v", keyFile, err)
+		}
+		accessToken = strings.TrimSpace(string(keyBytes))
+	}
+
+	// Fall back to environment variable
+	if accessToken == "" {
+		accessToken = os.Getenv("TAILSTREAM_KEY")
+	}
+
+	// Fall back to config file
+	if accessToken == "" && len(cfg.Streams) > 0 && cfg.Streams[0].Key != "" {
+		accessToken = cfg.Streams[0].Key
+	}
+
+	if accessToken == "" {
+		log.Fatal("stdin mode requires authentication via --key-file, TAILSTREAM_KEY environment variable, or config file with access token")
+	}
+
+	// Create a stream config for stdin mode
+	stream := StreamConfig{
+		Name:     "stdin",
+		StreamID: streamID,
+		Key:      accessToken,
+	}
+
+	host, _ := os.Hostname()
+	ctx := context.Background()
+
+	scanner := bufio.NewScanner(os.Stdin)
+	// Increase buffer size to handle large log lines (e.g., verbose JSON payloads, stack traces)
+	// Default is 64 KiB, we increase to 1 MiB
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+	batch := make([]Event, 0, 100)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	if os.Getenv("DEBUG") == "1" {
+		log.Printf("Starting stdin mode for stream: %s", streamID)
+	}
+
+	// Channel for new lines
+	lines := make(chan string, 100)
+
+	// Read stdin in goroutine
+	go func() {
+		for scanner.Scan() {
+			lines <- scanner.Text()
+		}
+		if err := scanner.Err(); err != nil {
+			log.Printf("Error reading stdin: %v", err)
+		}
+		close(lines) // Close channel instead of sending done signal
+	}()
+
+	// Process lines
+	running := true
+	for running {
+		select {
+		case <-ticker.C:
+			if len(batch) > 0 {
+				if os.Getenv("DEBUG") == "1" {
+					log.Printf("Timer tick, shipping %d events", len(batch))
+				}
+				if err := shipEvents(ctx, stream, "", batch); err != nil {
+					log.Printf("ship: %v", err)
+				}
+				batch = batch[:0]
+			}
+
+		case line, ok := <-lines:
+			if !ok {
+				// Channel closed, process remaining batch and exit
+				running = false
+				break
+			}
+			if os.Getenv("DEBUG") == "1" {
+				log.Printf("Processing line: %s", line)
+			}
+			ll := LogLine{File: "stdin", Line: line}
+			ev, ok := parseLine(ll, host, stream.Format)
+			if ok && ev != nil {
+				batch = append(batch, ev)
+				if len(batch) >= 100 {
+					if os.Getenv("DEBUG") == "1" {
+						log.Printf("Batch full, shipping %d events", len(batch))
+					}
+					if err := shipEvents(ctx, stream, "", batch); err != nil {
+						log.Printf("ship: %v", err)
+					}
+					batch = batch[:0]
+				}
+			}
+		}
+	}
+
+	// Ship any remaining events after stdin closes
+	if len(batch) > 0 {
+		if os.Getenv("DEBUG") == "1" {
+			log.Printf("EOF, shipping final %d events", len(batch))
+		}
+		if err := shipEvents(ctx, stream, "", batch); err != nil {
+			log.Printf("ship: %v", err)
+		}
+	}
+}
+
 func main() {
 	// Handle version command
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v" || os.Args[1] == "version") {
@@ -201,47 +327,55 @@ func main() {
 		return
 	}
 
-	// Handle help command
-	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h" || os.Args[1] == "help") {
+	// Show help by default when no arguments
+	showHelp := func() {
 		fmt.Printf("Tailstream Agent %s\n\n", Version)
 		fmt.Printf("USAGE:\n")
-		fmt.Printf("  tailstream-agent [COMMAND]\n\n")
+		fmt.Printf("  tailstream-agent [COMMAND]\n")
+		fmt.Printf("  <command> | tailstream-agent --stream-id <id>    # Stdin mode\n\n")
 		fmt.Printf("COMMANDS:\n")
-		fmt.Printf("  (none)       Start the agent (runs OAuth setup if needed)\n")
-		fmt.Printf("  oauth        Run OAuth setup wizard\n")
-		fmt.Printf("  setup        Run basic setup wizard (legacy)\n")
+		fmt.Printf("  run          Start the agent\n")
+		fmt.Printf("  setup        Run OAuth setup wizard\n")
 		fmt.Printf("  version      Show version information\n")
 		fmt.Printf("  update       Check for and install updates manually\n")
 		fmt.Printf("  status       Show agent and update status\n")
 		fmt.Printf("  help         Show this help message\n\n")
 		fmt.Printf("OPTIONS:\n")
 		fmt.Printf("  --config     Path to configuration file\n")
+		fmt.Printf("  --stream-id  Stream ID for stdin mode (pipe logs directly)\n")
+		fmt.Printf("  --key-file   Path to file containing access token (for stdin mode)\n")
 		fmt.Printf("  --version    Show version information\n")
 		fmt.Printf("  --help       Show this help message\n\n")
 		fmt.Printf("ENVIRONMENT VARIABLES:\n")
 		fmt.Printf("  TAILSTREAM_BASE_URL    Override default API base URL\n")
 		fmt.Printf("  TAILSTREAM_KEY         Access token for authentication\n\n")
 		fmt.Printf("EXAMPLES:\n")
-		fmt.Printf("  tailstream-agent                           # Start with OAuth setup\n")
-		fmt.Printf("  tailstream-agent setup                     # Run legacy setup wizard\n")
-		fmt.Printf("  TAILSTREAM_BASE_URL=https://dev.example.com tailstream-agent\n")
-		fmt.Printf("  tailstream-agent --config /path/config.yaml\n")
+		fmt.Printf("  # First time setup:\n")
+		fmt.Printf("  tailstream-agent setup                     # Run OAuth setup wizard\n\n")
+		fmt.Printf("  # Standard file-based mode:\n")
+		fmt.Printf("  tailstream-agent run                       # Start the agent\n")
+		fmt.Printf("  tailstream-agent run --config /path/config.yaml\n")
 		fmt.Printf("  tailstream-agent update                    # Manual update check\n")
-		fmt.Printf("  tailstream-agent status                    # Check status\n")
+		fmt.Printf("  tailstream-agent status                    # Check status\n\n")
+		fmt.Printf("  # Stdin mode (pipe any log source):\n")
+		fmt.Printf("  # First, securely store your access token:\n")
+		fmt.Printf("  echo 'your-access-token' > ~/.tailstream-key && chmod 600 ~/.tailstream-key\n\n")
+		fmt.Printf("  # Then pipe logs directly:\n")
+		fmt.Printf("  tail -f /var/log/nginx/access.log | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
+		fmt.Printf("  kubectl logs -f pod-name | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
+		fmt.Printf("  docker logs -f container | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
+		fmt.Printf("  journalctl -f | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
+	}
+
+	// Handle help command
+	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h" || os.Args[1] == "help") {
+		showHelp()
 		return
 	}
 
-	// Handle OAuth setup command
-	if len(os.Args) > 1 && os.Args[1] == "oauth" {
-		if err := setupOAuth(); err != nil {
-			log.Fatalf("OAuth setup failed: %v", err)
-		}
-		return
-	}
-
-	// Handle legacy basic setup command
+	// Handle setup command (OAuth)
 	if len(os.Args) > 1 && os.Args[1] == "setup" {
-		if err := setupWizard(); err != nil {
+		if err := setupOAuth(); err != nil {
 			log.Fatalf("Setup failed: %v", err)
 		}
 		return
@@ -266,23 +400,51 @@ func main() {
 		return
 	}
 
-	// Check if OAuth setup is needed
-	if len(os.Args) == 1 && needsSetup() {
-		if err := setupOAuth(); err != nil {
-			log.Fatalf("OAuth setup failed: %v", err)
+	// Handle update command
+	if len(os.Args) > 1 && (os.Args[1] == "update" || os.Args[1] == "--update") {
+		cfg := loadConfig()
+		fmt.Printf("Checking for updates (current version: %s)...\n", Version)
+		checkForUpdatesForce(cfg, true)
+		return
+	}
+
+	// Handle run command (or stdin mode)
+	isRunCommand := len(os.Args) > 1 && os.Args[1] == "run"
+	hasFlags := len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "-")
+
+	if isRunCommand {
+		// Remove "run" from args for config parsing
+		os.Args = append(os.Args[:1], os.Args[2:]...)
+	} else if len(os.Args) == 1 || hasFlags {
+		// Check for stdin mode (piped input)
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			// Not piped and no explicit run command
+			if hasFlags {
+				// Has flags but no pipe - this is an error
+				fmt.Printf("Error: Flags without command require piped input (stdin mode)\n\n")
+				showHelp()
+				return
+			}
+			// No command, no flags, no pipe - default to "run" command
+			// This allows systemd service to start with just "tailstream-agent"
 		}
+		// stdin is piped, continue to stdin mode below
+	} else {
+		// Unknown command
+		fmt.Printf("Unknown command: %s\n\n", os.Args[1])
+		showHelp()
 		return
 	}
 
 	cfg := loadConfig()
 
-	// Handle update command (after config loading)
-	for _, arg := range os.Args {
-		if arg == "update" || arg == "--update" {
-			fmt.Printf("Checking for updates (current version: %s)...\n", Version)
-			checkForUpdatesForce(cfg, true)
-			return
-		}
+	// Check for stdin mode
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		// stdin is a pipe - enter stdin mode
+		runStdinMode(cfg)
+		return
 	}
 
 	// Check for updates in the background

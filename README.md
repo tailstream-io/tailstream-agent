@@ -4,6 +4,10 @@ A lightweight Go agent that automatically discovers and ships logs to the Tailst
 
 ## ⚡ Quick Start
 
+Choose your installation method:
+- **Production/Always-on**: [One-liner installation](#one-liner-installation-recommended) - Installs as a system service
+- **Ad-hoc/Testing**: [Stdin mode](#stdin-mode-pipe-any-log-source) - Pipe logs directly without installation
+
 ### One-Liner Installation (Recommended)
 
 Install and set up the agent as a system service with a single command:
@@ -43,6 +47,8 @@ sudo -u tailstream tailstream-agent
 1. **Download** the binary for your platform:
    - **Linux (x86_64)**: [tailstream-agent-linux-amd64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-linux-amd64)
    - **Linux (ARM64)**: [tailstream-agent-linux-arm64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-linux-arm64)
+   - **macOS (ARM64)**: [tailstream-agent-darwin-arm64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-darwin-arm64)
+   - **macOS (x86_64)**: [tailstream-agent-darwin-amd64](https://github.com/tailstream-io/tailstream-agent/releases/latest/download/tailstream-agent-darwin-amd64)
    - **All releases**: [GitHub Releases](https://github.com/tailstream-io/tailstream-agent/releases)
 2. **Make executable and run setup** (first time only):
    ```bash
@@ -469,6 +475,30 @@ docker run -e TAILSTREAM_KEY=your-token \
 ```
 
 Note: With environment variables only, you'll need to run the setup wizard on first launch to configure the stream ID.
+
+#### Stdin mode (pipe any log source):
+Perfect for ad-hoc debugging, Kubernetes, Docker, or any streaming log source:
+
+```bash
+# First, securely store your access token (one time):
+echo 'your-access-token' > ~/.tailstream-key && chmod 600 ~/.tailstream-key
+
+# Then pipe logs from any source:
+tail -f /var/log/nginx/access.log | tailstream-agent --stream-id <stream-id> --key-file ~/.tailstream-key
+kubectl logs -f pod-name | tailstream-agent --stream-id <stream-id> --key-file ~/.tailstream-key
+docker logs -f container-name | tailstream-agent --stream-id <stream-id> --key-file ~/.tailstream-key
+journalctl -f | tailstream-agent --stream-id <stream-id> --key-file ~/.tailstream-key
+
+# Or use any custom command:
+./my-app --verbose 2>&1 | tailstream-agent --stream-id <stream-id> --key-file ~/.tailstream-key
+```
+
+**Stdin mode features:**
+- 🔒 **Secure** - Key stored in file with `chmod 600`, never exposed in process listings or shell history
+- 🚀 **Zero configuration** - No config file needed, just `--stream-id` and `--key-file`
+- 📦 **Portable** - Single binary, works anywhere Go runs
+- 🔄 **Format auto-detection** - Automatically handles nginx/apache logs, JSON, and plain text
+- 💨 **Low latency** - Ships batches every 100 events or 2 seconds
 
 ## How It Works
 

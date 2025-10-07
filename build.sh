@@ -2,12 +2,12 @@
 
 set -e
 
-# Simple Linux build script for tailstream-agent
+# Build script for tailstream-agent
 
 PROJECT_NAME="tailstream-agent"
 BUILD_DIR="dist"
 
-echo "Building $PROJECT_NAME for Linux..."
+echo "Building $PROJECT_NAME..."
 
 # Clean and create build directory
 rm -rf "$BUILD_DIR"
@@ -34,6 +34,18 @@ echo "Building for linux/arm64..."
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
     -ldflags="-w -s -X 'main.Version=$VERSION' -X 'main.BuildDate=$BUILD_DATE' -X 'main.GitCommit=$GIT_COMMIT'" \
     -o "../$BUILD_DIR/$PROJECT_NAME-linux-arm64" \
+    .
+
+echo "Building for darwin/amd64 (macOS Intel)..."
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build \
+    -ldflags="-w -s -X 'main.Version=$VERSION' -X 'main.BuildDate=$BUILD_DATE' -X 'main.GitCommit=$GIT_COMMIT'" \
+    -o "../$BUILD_DIR/$PROJECT_NAME-darwin-amd64" \
+    .
+
+echo "Building for darwin/arm64 (macOS Apple Silicon)..."
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build \
+    -ldflags="-w -s -X 'main.Version=$VERSION' -X 'main.BuildDate=$BUILD_DATE' -X 'main.GitCommit=$GIT_COMMIT'" \
+    -o "../$BUILD_DIR/$PROJECT_NAME-darwin-arm64" \
     .
 
 cd ..

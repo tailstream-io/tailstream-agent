@@ -27,7 +27,7 @@ jobs:
     - name: Build binaries
       env:
         VERSION: ${{ github.ref_name }}
-      run: ./build-linux.sh
+      run: ./build.sh
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
@@ -35,6 +35,8 @@ jobs:
         files: |
           dist/tailstream-agent-linux-amd64
           dist/tailstream-agent-linux-arm64
+          dist/tailstream-agent-darwin-amd64
+          dist/tailstream-agent-darwin-arm64
           dist/checksums.txt
         generate_release_notes: true
         draft: false

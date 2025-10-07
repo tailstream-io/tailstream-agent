@@ -82,6 +82,8 @@ func loadConfig() Config {
 		configFile := flag.String("config", getDefaultConfigPath(), "path to YAML config")
 		envFlag := flag.String("env", "", "environment")
 		debug := flag.Bool("debug", false, "enable debug output")
+		streamID := flag.String("stream-id", "", "stream ID for stdin mode")
+		keyFile := flag.String("key-file", "", "path to file containing access token (for stdin mode)")
 		flag.Parse()
 
 		// Load config file (default or specified)
@@ -95,6 +97,16 @@ func loadConfig() Config {
 		}
 		if *debug {
 			os.Setenv("DEBUG", "1")
+		}
+
+		// Store stream-id flag for stdin mode
+		if *streamID != "" {
+			os.Setenv("TAILSTREAM_STREAM_ID", *streamID)
+		}
+
+		// Store key-file flag for stdin mode
+		if *keyFile != "" {
+			os.Setenv("TAILSTREAM_KEY_FILE", *keyFile)
 		}
 	} else {
 		// In tests, just load the default config file if it exists
