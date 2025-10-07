@@ -323,16 +323,15 @@ func main() {
 		return
 	}
 
-	// Handle help command
-	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h" || os.Args[1] == "help") {
+	// Show help by default when no arguments
+	showHelp := func() {
 		fmt.Printf("Tailstream Agent %s\n\n", Version)
 		fmt.Printf("USAGE:\n")
 		fmt.Printf("  tailstream-agent [COMMAND]\n")
 		fmt.Printf("  <command> | tailstream-agent --stream-id <id>    # Stdin mode\n\n")
 		fmt.Printf("COMMANDS:\n")
-		fmt.Printf("  (none)       Start the agent (runs OAuth setup if needed)\n")
-		fmt.Printf("  oauth        Run OAuth setup wizard\n")
-		fmt.Printf("  setup        Run basic setup wizard (legacy)\n")
+		fmt.Printf("  run          Start the agent\n")
+		fmt.Printf("  setup        Run OAuth setup wizard\n")
 		fmt.Printf("  version      Show version information\n")
 		fmt.Printf("  update       Check for and install updates manually\n")
 		fmt.Printf("  status       Show agent and update status\n")
@@ -347,10 +346,11 @@ func main() {
 		fmt.Printf("  TAILSTREAM_BASE_URL    Override default API base URL\n")
 		fmt.Printf("  TAILSTREAM_KEY         Access token for authentication\n\n")
 		fmt.Printf("EXAMPLES:\n")
+		fmt.Printf("  # First time setup:\n")
+		fmt.Printf("  tailstream-agent setup                     # Run OAuth setup wizard\n\n")
 		fmt.Printf("  # Standard file-based mode:\n")
-		fmt.Printf("  tailstream-agent                           # Start with OAuth setup\n")
-		fmt.Printf("  tailstream-agent setup                     # Run legacy setup wizard\n")
-		fmt.Printf("  tailstream-agent --config /path/config.yaml\n")
+		fmt.Printf("  tailstream-agent run                       # Start the agent\n")
+		fmt.Printf("  tailstream-agent run --config /path/config.yaml\n")
 		fmt.Printf("  tailstream-agent update                    # Manual update check\n")
 		fmt.Printf("  tailstream-agent status                    # Check status\n\n")
 		fmt.Printf("  # Stdin mode (pipe any log source):\n")
@@ -361,20 +361,27 @@ func main() {
 		fmt.Printf("  kubectl logs -f pod-name | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
 		fmt.Printf("  docker logs -f container | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
 		fmt.Printf("  journalctl -f | tailstream-agent --stream-id <id> --key-file ~/.tailstream-key\n")
+	}
+
+	// Handle help command
+	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h" || os.Args[1] == "help") {
+		showHelp()
 		return
 	}
 
-	// Handle OAuth setup command
-	if len(os.Args) > 1 && os.Args[1] == "oauth" {
-		if err := setupOAuth(); err != nil {
-			log.Fatalf("OAuth setup failed: %v", err)
+	// Show help by default when no args (unless stdin is piped)
+	if len(os.Args) == 1 {
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			// Not piped, show help
+			showHelp()
+			return
 		}
-		return
 	}
 
-	// Handle legacy basic setup command
+	// Handle setup command (OAuth)
 	if len(os.Args) > 1 && os.Args[1] == "setup" {
-		if err := setupWizard(); err != nil {
+		if err := setupOAuth(); err != nil {
 			log.Fatalf("Setup failed: %v", err)
 		}
 		return
@@ -399,11 +406,32 @@ func main() {
 		return
 	}
 
-	// Check if OAuth setup is needed
-	if len(os.Args) == 1 && needsSetup() {
-		if err := setupOAuth(); err != nil {
-			log.Fatalf("OAuth setup failed: %v", err)
+	// Handle run command (or stdin mode)
+	isRunCommand := len(os.Args) > 1 && os.Args[1] == "run"
+	hasFlags := len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "-")
+
+	if isRunCommand {
+		// Remove "run" from args for config parsing
+		os.Args = append(os.Args[:1], os.Args[2:]...)
+	} else if len(os.Args) == 1 || hasFlags {
+		// Check for stdin mode (piped input)
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			// Not piped and no explicit run command
+			if !hasFlags {
+				// No command, no flags, no pipe - already showed help above
+				return
+			}
+			// Has flags but no pipe - this is an error
+			fmt.Printf("Error: Flags without command require piped input (stdin mode)\n\n")
+			showHelp()
+			return
 		}
+		// stdin is piped, continue to stdin mode below
+	} else {
+		// Unknown command
+		fmt.Printf("Unknown command: %s\n\n", os.Args[1])
+		showHelp()
 		return
 	}
 
