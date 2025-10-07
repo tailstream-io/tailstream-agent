@@ -369,16 +369,6 @@ func main() {
 		return
 	}
 
-	// Show help by default when no args (unless stdin is piped)
-	if len(os.Args) == 1 {
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) != 0 {
-			// Not piped, show help
-			showHelp()
-			return
-		}
-	}
-
 	// Handle setup command (OAuth)
 	if len(os.Args) > 1 && os.Args[1] == "setup" {
 		if err := setupOAuth(); err != nil {
@@ -406,6 +396,14 @@ func main() {
 		return
 	}
 
+	// Handle update command
+	if len(os.Args) > 1 && (os.Args[1] == "update" || os.Args[1] == "--update") {
+		cfg := loadConfig()
+		fmt.Printf("Checking for updates (current version: %s)...\n", Version)
+		checkForUpdatesForce(cfg, true)
+		return
+	}
+
 	// Handle run command (or stdin mode)
 	isRunCommand := len(os.Args) > 1 && os.Args[1] == "run"
 	hasFlags := len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "-")
@@ -418,14 +416,14 @@ func main() {
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) != 0 {
 			// Not piped and no explicit run command
-			if !hasFlags {
-				// No command, no flags, no pipe - already showed help above
+			if hasFlags {
+				// Has flags but no pipe - this is an error
+				fmt.Printf("Error: Flags without command require piped input (stdin mode)\n\n")
+				showHelp()
 				return
 			}
-			// Has flags but no pipe - this is an error
-			fmt.Printf("Error: Flags without command require piped input (stdin mode)\n\n")
-			showHelp()
-			return
+			// No command, no flags, no pipe - default to "run" command
+			// This allows systemd service to start with just "tailstream-agent"
 		}
 		// stdin is piped, continue to stdin mode below
 	} else {
@@ -436,15 +434,6 @@ func main() {
 	}
 
 	cfg := loadConfig()
-
-	// Handle update command (after config loading)
-	for _, arg := range os.Args {
-		if arg == "update" || arg == "--update" {
-			fmt.Printf("Checking for updates (current version: %s)...\n", Version)
-			checkForUpdatesForce(cfg, true)
-			return
-		}
-	}
 
 	// Check for stdin mode
 	stat, _ := os.Stdin.Stat()
