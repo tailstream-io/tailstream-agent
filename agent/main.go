@@ -447,9 +447,21 @@ func main() {
 		return
 	}
 
-	// Check for updates in the background
-	go checkForUpdates(cfg)
 	host, _ := os.Hostname()
+
+	// Start background update checker
+	go func() {
+		// Run initial check
+		checkForUpdates(cfg)
+
+		// Set up ticker for periodic checks
+		updateTicker := time.NewTicker(5 * time.Minute)
+		defer updateTicker.Stop()
+
+		for range updateTicker.C {
+			checkForUpdates(cfg)
+		}
+	}()
 
 	// Validate required configuration
 	if len(cfg.Streams) == 0 {

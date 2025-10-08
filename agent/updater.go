@@ -174,7 +174,17 @@ func shouldCheckForUpdates(cfg Config) bool {
 		return true
 	}
 
+	// Allow override for testing with short intervals
 	interval := time.Duration(cfg.Updates.CheckHours) * time.Hour
+	if testInterval := os.Getenv("TAILSTREAM_UPDATE_CHECK_INTERVAL"); testInterval != "" {
+		if duration, err := time.ParseDuration(testInterval); err == nil {
+			interval = duration
+			if os.Getenv("DEBUG") == "1" {
+				log.Printf("Using test update check interval: %v", interval)
+			}
+		}
+	}
+
 	return time.Since(info.ModTime()) > interval
 }
 
@@ -201,6 +211,10 @@ func getBinaryName() string {
 		return "tailstream-agent-linux-amd64"
 	} else if goos == "linux" && goarch == "arm64" {
 		return "tailstream-agent-linux-arm64"
+	} else if goos == "darwin" && goarch == "amd64" {
+		return "tailstream-agent-darwin-amd64"
+	} else if goos == "darwin" && goarch == "arm64" {
+		return "tailstream-agent-darwin-arm64"
 	}
 	return ""
 }
