@@ -37,16 +37,18 @@ func TestDiscover(t *testing.T) {
 }
 
 func TestParseLineJSON(t *testing.T) {
-	ll := LogLine{File: "/var/log/test.log", Line: `{"msg":"hi","host":"host1","src":"/var/log/test.log","path":"/test","method":"GET","status":200,"rt":0.1,"bytes":100}`}
-	ev, ok := parseLine(ll, "host1", nil)
+	line := `{"msg":"hi","host":"host1","src":"/var/log/test.log","path":"/test","method":"GET","status":200,"rt":0.1,"bytes":100}`
+	ll := LogLine{File: "/var/log/test.log", Line: line}
+	ev, ok := parseLine(ll, "host1")
 	if !ok {
 		t.Fatal("not parsed")
 	}
-	evMap, ok := ev.(map[string]interface{})
+	// Events are now returned as raw strings
+	evStr, ok := ev.(string)
 	if !ok {
-		t.Fatalf("Expected event to be a map, got type: %T", ev)
+		t.Fatalf("Expected event to be a string, got type: %T", ev)
 	}
-	if evMap["msg"] != "hi" || evMap["host"] != "host1" || evMap["src"] != "/var/log/test.log" {
-		t.Fatalf("bad event: %#v", evMap)
+	if evStr != line {
+		t.Fatalf("Expected raw string to match original line.\nGot:  %s\nWant: %s", evStr, line)
 	}
 }

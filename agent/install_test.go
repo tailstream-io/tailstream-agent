@@ -74,34 +74,25 @@ func TestBinaryInstallation(t *testing.T) {
 	select {
 	case data := <-received:
 		// Data should be in NDJSON format (newline-delimited JSON)
+		// Now events are sent as JSON strings: "raw log line"
 		lines := bytes.Split(bytes.TrimSpace(data), []byte("\n"))
 		if len(lines) != 1 {
 			t.Fatalf("expected 1 NDJSON line, got %d", len(lines))
 		}
 
-		var event map[string]any
-		if err := json.Unmarshal(lines[0], &event); err != nil {
+		var rawLog string
+		if err := json.Unmarshal(lines[0], &rawLog); err != nil {
 			t.Fatalf("bad NDJSON payload: %v", err)
 		}
 
-		// Verify required fields are present
-		requiredFields := []string{"host", "path", "method", "status", "rt", "bytes", "src"}
-		for _, field := range requiredFields {
-			if _, ok := event[field]; !ok {
-				t.Fatalf("missing required field %s in event: %v", field, event)
+		// Verify the raw log line contains expected data
+		expectedSubstrings := []string{"192.168.1.1", "GET", "/test", "200", "1234"}
+		for _, substr := range expectedSubstrings {
+			if !bytes.Contains([]byte(rawLog), []byte(substr)) {
+				t.Errorf("expected raw log to contain %q, got: %s", substr, rawLog)
 			}
 		}
 
-		// Verify some specific values
-		if event["path"] != "/test" {
-			t.Errorf("expected path '/test', got %v", event["path"])
-		}
-		if event["method"] != "GET" {
-			t.Errorf("expected method 'GET', got %v", event["method"])
-		}
-		if event["status"] != float64(200) { // JSON numbers are float64
-			t.Errorf("expected status 200, got %v", event["status"])
-		}
 
 	case <-time.After(5 * time.Second):
 		t.Fatalf("agent did not ship logs:\n%s", out.String())

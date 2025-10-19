@@ -291,7 +291,7 @@ func runStdinMode(cfg Config) {
 				log.Printf("Processing line: %s", line)
 			}
 			ll := LogLine{File: "stdin", Line: line}
-			ev, ok := parseLine(ll, host, stream.Format)
+			ev, ok := parseLine(ll, host)
 			if ok && ev != nil {
 				batch = append(batch, ev)
 				if len(batch) >= 100 {
@@ -551,7 +551,7 @@ func main() {
 					if os.Getenv("DEBUG") == "1" {
 						log.Printf("Processing line from %s (stream '%s'): %s", ll.File, streamName, ll.Line)
 					}
-					ev, ok := parseLine(ll, host, sd.stream.Format)
+					ev, ok := parseLine(ll, host)
 					if ok && ev != nil {
 						sd.batch = append(sd.batch, ev)
 						if os.Getenv("DEBUG") == "1" {
