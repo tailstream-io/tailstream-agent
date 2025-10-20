@@ -53,7 +53,6 @@ func TestMultiStreamDiscovery(t *testing.T) {
 	}
 }
 
-
 func TestStreamConfigValidation(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -128,7 +127,7 @@ func TestSingleStreamMultipleFormats(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ll := LogLine{File: "/test.log", Line: tt.logLine}
-			event, ok := parseLine(ll, "testhost")
+			event, ok := parseLine(ll)
 
 			if !ok {
 				t.Fatalf("parseLine() failed for %s", tt.name)
@@ -192,7 +191,7 @@ func TestMultiStreamDifferentFormats(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ll := LogLine{File: "/test.log", Line: tt.logLine}
-			event, ok := parseLine(ll, "testhost")
+			event, ok := parseLine(ll)
 
 			if !ok {
 				t.Errorf("parseLine() failed for stream %s", tt.stream.Name)
