@@ -4,173 +4,49 @@ import (
 	"testing"
 )
 
-func TestParseAccessLog(t *testing.T) {
+func TestParseLineIntegration(t *testing.T) {
 	tests := []struct {
 		name     string
 		line     string
-		expected *AccessLogEntry
 		wantOk   bool
+		expected string
 	}{
 		{
-			name: "nginx combined log format",
-			line: `86.94.167.37 - - [22/Sep/2025:17:04:36 +0000] "GET /article/test HTTP/2.0" 200 18547 "https://accounts.google.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"`,
-			expected: &AccessLogEntry{
-				Host:      "testhost",
-				Path:      "/article/test",
-				Method:    "GET",
-				Status:    200,
-				RT:        0.0,
-				Bytes:     18547,
-				Src:       "86.94.167.37",
-				UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-			},
-			wantOk: true,
+			name:     "nginx access log",
+			line:     `192.168.1.1 - - [22/Sep/2025:17:04:36 +0000] "GET /test HTTP/1.1" 200 1024 "https://example.com/" "curl/7.68.0"`,
+			wantOk:   true,
+			expected: `192.168.1.1 - - [22/Sep/2025:17:04:36 +0000] "GET /test HTTP/1.1" 200 1024 "https://example.com/" "curl/7.68.0"`,
 		},
 		{
-			name: "nginx with response time",
-			line: `192.168.1.1 - - [22/Sep/2025:17:04:36 +0000] "POST /api/test HTTP/1.1" 201 1024 "https://example.com/" "curl/7.68.0" 0.123`,
-			expected: &AccessLogEntry{
-				Host:      "testhost",
-				Path:      "/api/test",
-				Method:    "POST",
-				Status:    201,
-				RT:        0.123,
-				Bytes:     1024,
-				Src:       "192.168.1.1",
-				UserAgent: "curl/7.68.0",
-			},
-			wantOk: true,
+			name:     "JSON log",
+			line:     `{"host":"server1","path":"/api","method":"GET","status":200,"rt":0.1,"bytes":500,"src":"test.log"}`,
+			wantOk:   true,
+			expected: `{"host":"server1","path":"/api","method":"GET","status":200,"rt":0.1,"bytes":500,"src":"test.log"}`,
 		},
 		{
-			name: "common log format",
-			line: `127.0.0.1 - - [22/Sep/2025:17:04:36 +0000] "GET /index.html HTTP/1.1" 200 2326`,
-			expected: &AccessLogEntry{
-				Host:   "testhost",
-				Path:   "/index.html",
-				Method: "GET",
-				Status: 200,
-				RT:     0.0,
-				Bytes:  2326,
-				Src:    "127.0.0.1",
-			},
-			wantOk: true,
+			name:     "plain text syslog",
+			line:     "2024-01-15T10:30:45Z ERROR Database connection failed after 3 retries",
+			wantOk:   true,
+			expected: "2024-01-15T10:30:45Z ERROR Database connection failed after 3 retries",
 		},
 		{
-			name:     "invalid log format",
-			line:     "this is not a valid access log line",
-			expected: nil,
-			wantOk:   false,
+			name:     "plain text application log",
+			line:     "[2024-01-15 10:30:45] production.ERROR: Connection timeout",
+			wantOk:   true,
+			expected: "[2024-01-15 10:30:45] production.ERROR: Connection timeout",
 		},
 		{
-			name: "apache combined format",
-			line: `10.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.example.com/start.html" "Mozilla/4.08 [en] (Win98; I ;Nav)"`,
-			expected: &AccessLogEntry{
-				Host:      "testhost",
-				Path:      "/apache_pb.gif",
-				Method:    "GET",
-				Status:    200,
-				RT:        0.0,
-				Bytes:     2326,
-				Src:       "10.0.0.1",
-				UserAgent: "Mozilla/4.08 [en] (Win98; I ;Nav)",
-			},
-			wantOk: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, ok := parseAccessLog(tt.line, "/var/log/nginx/access.log", "testhost")
-			if tt.name == "apache combined format" {
-				result, ok = parseAccessLog(tt.line, "/var/log/apache2/access.log", "testhost")
-			}
-
-			if ok != tt.wantOk {
-				t.Errorf("parseAccessLog() ok = %v, wantOk %v", ok, tt.wantOk)
-				return
-			}
-
-			if !tt.wantOk {
-				return
-			}
-
-			if result.Host != tt.expected.Host {
-				t.Errorf("Host = %v, want %v", result.Host, tt.expected.Host)
-			}
-			if result.Path != tt.expected.Path {
-				t.Errorf("Path = %v, want %v", result.Path, tt.expected.Path)
-			}
-			if result.Method != tt.expected.Method {
-				t.Errorf("Method = %v, want %v", result.Method, tt.expected.Method)
-			}
-			if result.Status != tt.expected.Status {
-				t.Errorf("Status = %v, want %v", result.Status, tt.expected.Status)
-			}
-			if result.RT != tt.expected.RT {
-				t.Errorf("RT = %v, want %v", result.RT, tt.expected.RT)
-			}
-			if result.Bytes != tt.expected.Bytes {
-				t.Errorf("Bytes = %v, want %v", result.Bytes, tt.expected.Bytes)
-			}
-			if result.Src != tt.expected.Src {
-				t.Errorf("Src = %v, want %v", result.Src, tt.expected.Src)
-			}
-			if result.UserAgent != tt.expected.UserAgent {
-				t.Errorf("UserAgent = %v, want %v", result.UserAgent, tt.expected.UserAgent)
-			}
-		})
-	}
-}
-
-func TestParseLineIntegration(t *testing.T) {
-	tests := []struct {
-		name           string
-		line           string
-		wantOk         bool
-		checkKey       string
-		requiredFields []string
-	}{
-		{
-			name:           "valid access log",
-			line:           `192.168.1.1 - - [22/Sep/2025:17:04:36 +0000] "GET /test HTTP/1.1" 200 1024 "https://example.com/" "curl/7.68.0"`,
-			wantOk:         true,
-			checkKey:       "path",
-			requiredFields: []string{"host", "path", "method", "status", "rt", "bytes", "src"},
-		},
-		{
-			name:           "valid JSON log",
-			line:           `{"host":"server1","path":"/api","method":"GET","status":200,"rt":0.1,"bytes":500,"src":"test.log"}`,
-			wantOk:         true,
-			checkKey:       "path",
-			requiredFields: []string{"host", "path", "method", "status", "rt", "bytes", "src"},
-		},
-		{
-			name:           "plain text syslog",
-			line:           "2024-01-15T10:30:45Z ERROR Database connection failed after 3 retries",
-			wantOk:         true,
-			checkKey:       "", // Raw string, no key to check
-			requiredFields: []string{},
-		},
-		{
-			name:           "plain text application log",
-			line:           "[2024-01-15 10:30:45] production.ERROR: Connection timeout",
-			wantOk:         true,
-			checkKey:       "", // Raw string, no key to check
-			requiredFields: []string{},
-		},
-		{
-			name:           "random text",
-			line:           "random text that cannot be parsed",
-			wantOk:         true,
-			checkKey:       "", // Raw string, no key to check
-			requiredFields: []string{},
+			name:     "random text",
+			line:     "random text that cannot be parsed",
+			wantOk:   true,
+			expected: "random text that cannot be parsed",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ll := LogLine{File: "/test.log", Line: tt.line}
-			event, ok := parseLine(ll, "testhost", nil)
+			event, ok := parseLine(ll)
 
 			if ok != tt.wantOk {
 				t.Errorf("parseLine() ok = %v, wantOk %v", ok, tt.wantOk)
@@ -181,34 +57,15 @@ func TestParseLineIntegration(t *testing.T) {
 				return
 			}
 
-			// Check if this is a raw string event or structured event
-			if tt.checkKey == "" {
-				// Should be a raw string
-				if str, ok := event.(string); ok {
-					if str != tt.line {
-						t.Errorf("Expected raw string to match original line. Got: %s, Want: %s", str, tt.line)
-					}
-				} else {
-					t.Errorf("Expected event to be a raw string, got type: %T", event)
-				}
-			} else {
-				// Should be a structured event (map)
-				eventMap, ok := event.(map[string]interface{})
-				if !ok {
-					t.Errorf("Expected event to be a map, got type: %T", event)
-					return
-				}
+			// All events should now be raw strings
+			str, ok := event.(string)
+			if !ok {
+				t.Errorf("Expected event to be a raw string, got type: %T", event)
+				return
+			}
 
-				if _, hasKey := eventMap[tt.checkKey]; !hasKey {
-					t.Errorf("Expected key %s not found in event: %+v", tt.checkKey, eventMap)
-				}
-
-				// Verify required fields are present
-				for _, field := range tt.requiredFields {
-					if _, has := eventMap[field]; !has {
-						t.Errorf("Required field %s missing from event: %+v", field, eventMap)
-					}
-				}
+			if str != tt.expected {
+				t.Errorf("Expected raw string to match original line.\nGot:  %s\nWant: %s", str, tt.expected)
 			}
 		})
 	}

@@ -1,6 +1,6 @@
 # Tailstream Agent
 
-A lightweight Go agent that automatically discovers and ships logs to the Tailstream ingest API for real-time log analysis. Supports web server access logs, JSON logs, custom formats, and raw text logs.
+A lightweight Go agent that automatically discovers and ships logs to the Tailstream ingest API for real-time log analysis. Streams raw log lines as-is to the backend for parsing.
 
 ## ⚡ Quick Start
 
@@ -299,59 +299,9 @@ streams:
 - **Independent access control**: Use different access tokens per stream
 - **Organized log routing**: Route nginx logs, application logs, and system logs separately
 - **Flexible patterns**: Each stream can have its own include/exclude patterns
-- **Custom log formats**: Define custom regex patterns to parse application-specific logs
-- **Auto-format detection**: Each stream automatically detects formats (JSON, access logs, plain text)
+- **Format agnostic**: All logs are sent as raw text - backend handles parsing
 - **Mixed formats per stream**: A single stream can handle multiple file formats simultaneously
 - **Backward compatible**: Existing single-stream configs continue to work
-
-### Custom Log Formats
-
-For applications that generate logs in custom formats, you can define parsing rules per stream:
-
-```yaml
-streams:
-  - name: "app-logs"
-    stream_id: "app-stream-id"
-    paths:
-      - "/var/log/myapp/*.log"
-    format:
-      name: "myapp-format"
-      pattern: '\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (\w+)\.(\w+): (.+)'
-      fields:
-        method: "2"      # Log level (INFO, ERROR, etc)
-        path: "3"        # Component name
-        host: "hostname" # Use server hostname
-        src: "filename"  # Use source file path
-      default:
-        status: 200      # Default HTTP status for app logs
-        rt: 0.0         # Default response time
-        bytes: 0        # Default bytes transferred
-
-  - name: "custom-access-logs"
-    stream_id: "access-stream-id"
-    paths:
-      - "/var/log/custom-app/access.log"
-    format:
-      name: "custom-access"
-      pattern: '^(\d+\.\d+\.\d+\.\d+) - (\w+) (\S+) (\d+) (\d+) ([0-9.]+)'
-      fields:
-        ip: "1"
-        method: "2"
-        path: "3"
-        status: "4"
-        bytes: "5"
-        rt: "6"
-```
-
-#### Custom Format Fields
-
-- **Pattern**: Regex pattern with capture groups (use single quotes to avoid YAML escaping)
-- **Fields**: Map regex group numbers to output field names
-- **Special placeholders**:
-  - `"hostname"`: Uses server hostname
-  - `"filename"`: Uses source file path
-- **Default**: Default values for missing fields
-- **Auto-conversion**: `status`, `bytes`, and `rt` fields are automatically converted to appropriate types
 
 ### Manual Configuration
 
@@ -497,31 +447,23 @@ journalctl -f | tailstream-agent --stream-id <stream-id> --key-file ~/.tailstrea
 - 🔒 **Secure** - Key stored in file with `chmod 600`, never exposed in process listings or shell history
 - 🚀 **Zero configuration** - No config file needed, just `--stream-id` and `--key-file`
 - 📦 **Portable** - Single binary, works anywhere Go runs
-- 🔄 **Format auto-detection** - Automatically handles nginx/apache logs, JSON, and plain text
 - 💨 **Low latency** - Ships batches every 100 events or 2 seconds
 
 ## How It Works
 
 1. **Discovery**: The agent scans filesystem paths using glob patterns to find log files
 2. **Tailing**: Continuously monitors discovered files for new lines (similar to `tail -f`)
-3. **Parsing**: Automatically detects and parses log formats
-4. **Batching**: Collects up to 100 events or waits 2 seconds before shipping
-5. **Shipping**: Sends batches via HTTP POST to Tailstream ingest API as NDJSON
+3. **Batching**: Collects up to 100 events or waits 2 seconds before shipping
+4. **Shipping**: Sends raw log lines via HTTP POST to Tailstream ingest API as NDJSON
 
-### Supported Log Formats
+### Log Handling
 
-The agent automatically detects and handles multiple log formats:
+The agent streams all log lines as raw text to the Tailstream backend:
 
-#### **Auto-Detected Formats**
-- **Nginx/Apache Access Logs** - Automatically parsed to structured JSON
-- **JSON Logs** - Validated and forwarded as JSON
-- **Plain Text Logs** - Sent as-is (syslogs, application logs, etc.)
-  - Backend auto-detects format for Laravel logs, syslogs, and other text formats
-
-#### **Custom Formats**
-- Define custom regex patterns per stream
-- Map log fields to structured output
-- See "Custom Log Formats" section for examples
+- **No local parsing** - Logs are sent exactly as written
+- **Format agnostic** - Works with any log format (nginx, apache, JSON, syslog, custom formats, etc.)
+- **Backend processing** - The Tailstream backend handles all parsing and format detection
+- **Simple and reliable** - What you write is what gets shipped
 
 ## Testing
 

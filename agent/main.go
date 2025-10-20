@@ -23,8 +23,6 @@ var (
 	GitCommit = "unknown"
 )
 
-
-
 // LogLine represents a line read from a file.
 type LogLine struct {
 	File string
@@ -135,7 +133,6 @@ func tailFile(ctx context.Context, file string, ch chan<- LogLine) {
 	}
 }
 
-
 // shipEvents POSTs a batch of events to a specific stream's ingest endpoint as NDJSON.
 func shipEvents(ctx context.Context, stream StreamConfig, globalKey string, events []Event) error {
 	if stream.StreamID == "" {
@@ -236,7 +233,6 @@ func runStdinMode(cfg Config) {
 		Key:      accessToken,
 	}
 
-	host, _ := os.Hostname()
 	ctx := context.Background()
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -291,7 +287,7 @@ func runStdinMode(cfg Config) {
 				log.Printf("Processing line: %s", line)
 			}
 			ll := LogLine{File: "stdin", Line: line}
-			ev, ok := parseLine(ll, host, stream.Format)
+			ev, ok := parseLine(ll)
 			if ok && ev != nil {
 				batch = append(batch, ev)
 				if len(batch) >= 100 {
@@ -447,8 +443,6 @@ func main() {
 		return
 	}
 
-	host, _ := os.Hostname()
-
 	// Start background update checker
 	go func() {
 		// Run initial check
@@ -551,7 +545,7 @@ func main() {
 					if os.Getenv("DEBUG") == "1" {
 						log.Printf("Processing line from %s (stream '%s'): %s", ll.File, streamName, ll.Line)
 					}
-					ev, ok := parseLine(ll, host, sd.stream.Format)
+					ev, ok := parseLine(ll)
 					if ok && ev != nil {
 						sd.batch = append(sd.batch, ev)
 						if os.Getenv("DEBUG") == "1" {

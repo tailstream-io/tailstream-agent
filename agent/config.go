@@ -30,23 +30,14 @@ type Config struct {
 	Streams []StreamConfig `yaml:"streams,omitempty"`
 }
 
-// LogFormat defines a custom log format configuration
-type LogFormat struct {
-	Name    string            `yaml:"name"`              // Human-readable name for this format
-	Pattern string            `yaml:"pattern"`           // Regex pattern to match log lines
-	Fields  map[string]string `yaml:"fields"`            // Field mapping from regex groups to output fields
-	Default map[string]any    `yaml:"default,omitempty"` // Default values for missing fields
-}
-
 // StreamConfig defines a destination stream with its own settings
 type StreamConfig struct {
-	Name      string     `yaml:"name"`              // Human-readable name for this stream
-	StreamID  string     `yaml:"stream_id"`         // Stream ID - URL will be constructed as https://app.tailstream.io/api/ingest/{stream_id}
-	URL       string     `yaml:"url,omitempty"`     // Optional custom URL (overrides default URL construction)
-	Key       string     `yaml:"key,omitempty"`     // Optional stream-specific access token
-	Paths     []string   `yaml:"paths"`             // Log file patterns for this stream
-	Exclude   []string   `yaml:"exclude,omitempty"` // Exclusion patterns for this stream
-	Format    *LogFormat `yaml:"format,omitempty"`  // Custom log format for this stream
+	Name     string   `yaml:"name"`              // Human-readable name for this stream
+	StreamID string   `yaml:"stream_id"`         // Stream ID - URL will be constructed as https://app.tailstream.io/api/ingest/{stream_id}
+	URL      string   `yaml:"url,omitempty"`     // Optional custom URL (overrides default URL construction)
+	Key      string   `yaml:"key,omitempty"`     // Optional stream-specific access token
+	Paths    []string `yaml:"paths"`             // Log file patterns for this stream
+	Exclude  []string `yaml:"exclude,omitempty"` // Exclusion patterns for this stream
 }
 
 // GetURL returns the full ingest URL for this stream
