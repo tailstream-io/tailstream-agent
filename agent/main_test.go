@@ -43,12 +43,15 @@ func TestParseLineJSON(t *testing.T) {
 	if !ok {
 		t.Fatal("not parsed")
 	}
-	// Events are now returned as raw strings
-	evStr, ok := ev.(string)
+	// Events are now returned as LogEvent structs with metadata
+	logEvent, ok := ev.(LogEvent)
 	if !ok {
-		t.Fatalf("Expected event to be a string, got type: %T", ev)
+		t.Fatalf("Expected event to be a LogEvent, got type: %T", ev)
 	}
-	if evStr != line {
-		t.Fatalf("Expected raw string to match original line.\nGot:  %s\nWant: %s", evStr, line)
+	if logEvent.Log != line {
+		t.Fatalf("Expected log content to match original line.\nGot:  %s\nWant: %s", logEvent.Log, line)
+	}
+	if logEvent.Filename != "/var/log/test.log" {
+		t.Fatalf("Expected filename to be /var/log/test.log, got: %s", logEvent.Filename)
 	}
 }
