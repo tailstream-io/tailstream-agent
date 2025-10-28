@@ -57,15 +57,19 @@ func TestParseLineIntegration(t *testing.T) {
 				return
 			}
 
-			// All events should now be raw strings
-			str, ok := event.(string)
+			// All events should now be LogEvent structs with metadata
+			logEvent, ok := event.(LogEvent)
 			if !ok {
-				t.Errorf("Expected event to be a raw string, got type: %T", event)
+				t.Errorf("Expected event to be a LogEvent, got type: %T", event)
 				return
 			}
 
-			if str != tt.expected {
-				t.Errorf("Expected raw string to match original line.\nGot:  %s\nWant: %s", str, tt.expected)
+			if logEvent.Log != tt.expected {
+				t.Errorf("Expected log content to match original line.\nGot:  %s\nWant: %s", logEvent.Log, tt.expected)
+			}
+
+			if logEvent.Filename != "/test.log" {
+				t.Errorf("Expected filename to be /test.log, got: %s", logEvent.Filename)
 			}
 		})
 	}

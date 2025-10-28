@@ -133,15 +133,19 @@ func TestSingleStreamMultipleFormats(t *testing.T) {
 				t.Fatalf("parseLine() failed for %s", tt.name)
 			}
 
-			// All events are now raw strings - backend handles parsing
-			evStr, ok := event.(string)
+			// All events are now LogEvent structs with metadata
+			logEvent, ok := event.(LogEvent)
 			if !ok {
-				t.Errorf("Expected event to be string, got type: %T", event)
+				t.Errorf("Expected event to be LogEvent, got type: %T", event)
 				return
 			}
 
-			if evStr != tt.logLine {
-				t.Errorf("Expected raw string to match original line.\nGot:  %s\nWant: %s", evStr, tt.logLine)
+			if logEvent.Log != tt.logLine {
+				t.Errorf("Expected log content to match original line.\nGot:  %s\nWant: %s", logEvent.Log, tt.logLine)
+			}
+
+			if logEvent.Filename != "/test.log" {
+				t.Errorf("Expected filename to be /test.log, got: %s", logEvent.Filename)
 			}
 		})
 	}
@@ -198,15 +202,19 @@ func TestMultiStreamDifferentFormats(t *testing.T) {
 				return
 			}
 
-			// All events are now raw strings - backend handles parsing
-			evStr, ok := event.(string)
+			// All events are now LogEvent structs with metadata
+			logEvent, ok := event.(LogEvent)
 			if !ok {
-				t.Errorf("Expected event to be string for stream %s, got type: %T", tt.stream.Name, event)
+				t.Errorf("Expected event to be LogEvent for stream %s, got type: %T", tt.stream.Name, event)
 				return
 			}
 
-			if evStr != tt.logLine {
-				t.Errorf("Expected raw string to match original line.\nGot:  %s\nWant: %s", evStr, tt.logLine)
+			if logEvent.Log != tt.logLine {
+				t.Errorf("Expected log content to match original line.\nGot:  %s\nWant: %s", logEvent.Log, tt.logLine)
+			}
+
+			if logEvent.Filename != "/test.log" {
+				t.Errorf("Expected filename to be /test.log, got: %s", logEvent.Filename)
 			}
 		})
 	}
