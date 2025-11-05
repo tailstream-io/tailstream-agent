@@ -160,6 +160,7 @@ func shipEvents(ctx context.Context, stream StreamConfig, globalKey string, even
 		return err
 	}
 	req.Header.Set("Content-Type", "application/x-ndjson")
+	setDefaultUserAgent(req)
 
 	// Use stream-specific key if available, otherwise fall back to global key
 	key := stream.Key

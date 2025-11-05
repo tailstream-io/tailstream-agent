@@ -142,7 +142,14 @@ func requestDeviceCode() (*DeviceCodeResponse, error) {
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.PostForm(getBaseURL()+"/api/oauth/device/code", data)
+	req, err := http.NewRequest(http.MethodPost, getBaseURL()+"/api/oauth/device/code", strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	setDefaultUserAgent(req)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +180,14 @@ func pollForToken(deviceCode string, interval int) (*TokenResponse, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	for time.Now().Before(timeout) {
-		resp, err := client.PostForm(getBaseURL()+"/api/oauth/device/token", data)
+		req, err := http.NewRequest(http.MethodPost, getBaseURL()+"/api/oauth/device/token", strings.NewReader(data.Encode()))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		setDefaultUserAgent(req)
+
+		resp, err := client.Do(req)
 		if err != nil {
 			time.Sleep(time.Duration(interval) * time.Second)
 			continue
@@ -207,11 +221,12 @@ func fetchUserData(accessToken string) ([]Stream, UserPlan, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	// Fetch streams
-	req, err := http.NewRequest("GET", getBaseURL()+"/api/user/streams", nil)
+	req, err := http.NewRequest(http.MethodGet, getBaseURL()+"/api/user/streams", nil)
 	if err != nil {
 		return nil, UserPlan{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
+	setDefaultUserAgent(req)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -229,11 +244,12 @@ func fetchUserData(accessToken string) ([]Stream, UserPlan, error) {
 	}
 
 	// Fetch plan
-	req, err = http.NewRequest("GET", getBaseURL()+"/api/user/plan", nil)
+	req, err = http.NewRequest(http.MethodGet, getBaseURL()+"/api/user/plan", nil)
 	if err != nil {
 		return nil, UserPlan{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
+	setDefaultUserAgent(req)
 
 	resp, err = client.Do(req)
 	if err != nil {
@@ -257,11 +273,12 @@ func fetchUserData(accessToken string) ([]Stream, UserPlan, error) {
 func fetchStreamDetails(streamID string, accessToken string) (*Stream, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	req, err := http.NewRequest("GET", getBaseURL()+"/api/streams/"+streamID, nil)
+	req, err := http.NewRequest(http.MethodGet, getBaseURL()+"/api/streams/"+streamID, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
+	setDefaultUserAgent(req)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -364,12 +381,13 @@ func createStreamWithName(name, accessToken string) (*StreamConfig, error) {
 	data := map[string]string{"name": name}
 	jsonData, _ := json.Marshal(data)
 
-	req, err := http.NewRequest("POST", getBaseURL()+"/api/streams", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest(http.MethodPost, getBaseURL()+"/api/streams", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
+	setDefaultUserAgent(req)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
@@ -517,13 +535,13 @@ func createOAuthConfig(streams []StreamConfig) Config {
 		},
 		// No Ship section - legacy single-stream config not needed
 		Updates: struct {
-			Enabled       bool   `yaml:"enabled"`
-			Channel       string `yaml:"channel"`
-			CheckHours    int    `yaml:"check_hours"`
+			Enabled    bool   `yaml:"enabled"`
+			Channel    string `yaml:"channel"`
+			CheckHours int    `yaml:"check_hours"`
 		}{
-			Enabled:       true,
-			Channel:       "stable",
-			CheckHours:    24,
+			Enabled:    true,
+			Channel:    "stable",
+			CheckHours: 24,
 		},
 		Streams: streams,
 	}
