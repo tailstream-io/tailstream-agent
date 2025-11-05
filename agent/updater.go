@@ -102,13 +102,13 @@ func getLatestRelease(channel string) (*GitHubRelease, error) {
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", fmt.Sprintf("tailstream-agent/%s", Version))
+	setDefaultUserAgent(req)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -232,7 +232,13 @@ func checkWritePermission(dir string) error {
 }
 
 func downloadFile(url, destination string) error {
-	resp, err := http.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	setDefaultUserAgent(req)
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -254,7 +260,13 @@ func downloadFile(url, destination string) error {
 
 func verifyChecksum(filePath, checksumURL, filename string) error {
 	// Download checksums file
-	resp, err := http.Get(checksumURL)
+	req, err := http.NewRequest(http.MethodGet, checksumURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to build checksum request: %v", err)
+	}
+	setDefaultUserAgent(req)
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to download checksums: %v", err)
 	}
@@ -474,7 +486,6 @@ func checkForUpdatesForce(cfg Config, force bool) {
 		log.Printf("Binary not found in release assets for %s", binaryName)
 		return
 	}
-
 
 	// Perform the self-update
 	if err := performSelfUpdate(updateInfo); err != nil {
